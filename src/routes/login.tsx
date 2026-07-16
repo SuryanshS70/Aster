@@ -17,10 +17,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   return (
-    <AuthLayout
-      heading="Welcome back!"
-      subheading="Sign in to continue where you left off."
-    >
+    <AuthLayout heading="Welcome back!" subheading="Sign in to continue where you left off.">
       <AuthCard title="Sign into Aster">
         <LoginForm />
       </AuthCard>

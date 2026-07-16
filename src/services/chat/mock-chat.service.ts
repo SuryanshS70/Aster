@@ -1,11 +1,6 @@
 import { mockDelay, mockId, mockMessages, mockResponseTokens } from "@/mocks/mock-data";
 import { touchMockConversation } from "../conversations/mock-conversation.service";
-import type {
-  ChatService,
-  Message,
-  SendMessageInput,
-  StreamChunk,
-} from "./chat.types";
+import type { ChatService, Message, SendMessageInput, StreamChunk } from "./chat.types";
 
 const STORAGE_KEY = "aster.messages.v1";
 
@@ -36,10 +31,7 @@ function push(conversationId: string, message: Message) {
 
 const abortFlags = new Map<string, boolean>();
 
-function streamTokens(
-  conversationId: string,
-  tokens: string[],
-): AsyncIterable<StreamChunk> {
+function streamTokens(conversationId: string, tokens: string[]): AsyncIterable<StreamChunk> {
   abortFlags.set(conversationId, false);
   async function* run(): AsyncIterable<StreamChunk> {
     await mockDelay(250, 500); // "thinking"
@@ -82,10 +74,7 @@ export const mockChatService: ChatService = {
       status: "complete",
     };
     push(conversationId, userMsg);
-    touchMockConversation(
-      conversationId,
-      content.length > 0 ? content.slice(0, 60) : undefined,
-    );
+    touchMockConversation(conversationId, content.length > 0 ? content.slice(0, 60) : undefined);
     return streamTokens(conversationId, mockResponseTokens(content));
   },
 
@@ -96,9 +85,7 @@ export const mockChatService: ChatService = {
   regenerateResponse(conversationId: string) {
     const messages = loadAll()[conversationId] ?? [];
     // Drop the last assistant message so the new one replaces it.
-    const lastAssistantIdx = [...messages]
-      .reverse()
-      .findIndex((m) => m.role === "assistant");
+    const lastAssistantIdx = [...messages].reverse().findIndex((m) => m.role === "assistant");
     if (lastAssistantIdx !== -1) {
       const idx = messages.length - 1 - lastAssistantIdx;
       const trimmed = messages.slice(0, idx);

@@ -6,7 +6,14 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+const nodeNitroConfig = {
+  preset: "node-server",
+  // Bundle server dependencies so the production image needs only the .output artifact.
+  noExternals: true,
+} as const;
+
 export default defineConfig({
+  nitro: nodeNitroConfig,
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

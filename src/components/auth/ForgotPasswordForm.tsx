@@ -19,8 +19,8 @@ export function ForgotPasswordForm() {
     return (
       <div className="space-y-4 text-sm">
         <p>
-          If an account exists for <span className="font-medium">{email}</span>,
-          we've sent a reset link.
+          If an account exists for <span className="font-medium">{email}</span>, we've sent a reset
+          link.
         </p>
         <Link to="/login" className="text-primary hover:underline">
           Back to sign in

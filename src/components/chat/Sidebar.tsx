@@ -100,10 +100,7 @@ export function Sidebar({ onNavigate }: Props) {
 
         {conversations.isError && (
           <div className="p-2">
-            <ErrorState
-              title="Couldn't load chats"
-              onRetry={() => conversations.refetch()}
-            />
+            <ErrorState title="Couldn't load chats" onRetry={() => conversations.refetch()} />
           </div>
         )}
 
@@ -141,7 +138,6 @@ export function Sidebar({ onNavigate }: Props) {
               onRename={handleRename}
               onNavigate={onNavigate}
             />
-
           </div>
         )}
       </ScrollArea>
@@ -156,9 +152,7 @@ export function Sidebar({ onNavigate }: Props) {
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {session?.user.name ?? "Guest"}
-                </p>
+                <p className="truncate text-sm font-medium">{session?.user.name ?? "Guest"}</p>
                 <p className="truncate text-xs text-muted-foreground">
                   {session?.user.email ?? ""}
                 </p>

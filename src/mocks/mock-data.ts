@@ -3,9 +3,7 @@ import type { Conversation } from "@/services/conversations/conversation.types";
 import type { Message } from "@/services/chat/chat.types";
 
 export const mockDelay = (min = 200, max = 600): Promise<void> =>
-  new Promise((resolve) =>
-    setTimeout(resolve, Math.floor(min + Math.random() * (max - min))),
-  );
+  new Promise((resolve) => setTimeout(resolve, Math.floor(min + Math.random() * (max - min))));
 
 export const mockId = (prefix = "id"): string =>
   `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;

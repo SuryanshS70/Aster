@@ -11,7 +11,8 @@ Everything data-related currently runs against an in-memory + `localStorage` moc
 - TanStack Start (file-based routing) + TanStack Query
 - Tailwind CSS v4
 - shadcn/ui + Radix primitives
-- Zod (form + input validation)
+- Zod shared validation contracts
+- Vitest
 - Lucide icons
 
 ## Getting started
@@ -23,6 +24,7 @@ npm run build        # production build
 npm run build:dev    # dev-mode build (used by CI/preview)
 npm run lint         # ESLint
 npm run typecheck    # TypeScript --noEmit
+npm test             # Vitest test suite
 npm run format       # Prettier
 ```
 
@@ -37,6 +39,7 @@ src/
 │   ├── chat/          ChatShell, Sidebar, TopBar, MessageList, Composer, ...
 │   ├── common/        Logo, Loading, Empty, Error states
 │   └── ui/            shadcn primitives
+├── contracts/         Shared Zod schemas + inferred request/domain types
 ├── hooks/             useAuth, useConversations, useMessages, queryKeys
 ├── lib/               utils + error reporting
 ├── mocks/             mock-data.ts — the ONLY place that seeds mock data

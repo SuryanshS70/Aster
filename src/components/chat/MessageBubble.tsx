@@ -21,12 +21,7 @@ export function MessageBubble({ message, streaming, onRegenerate }: Props) {
   }
 
   return (
-    <div
-      className={cn(
-        "group flex w-full gap-3 py-4",
-        isUser ? "justify-end" : "justify-start",
-      )}
-    >
+    <div className={cn("group flex w-full gap-3 py-4", isUser ? "justify-end" : "justify-start")}>
       {!isUser && (
         <div className="mt-0.5 shrink-0">
           <Logo showText={false} size={28} />
@@ -36,9 +31,7 @@ export function MessageBubble({ message, streaming, onRegenerate }: Props) {
         <div
           className={cn(
             "whitespace-pre-wrap break-words rounded-2xl text-sm leading-relaxed",
-            isUser
-              ? "bg-primary px-4 py-2.5 text-primary-foreground"
-              : "text-foreground",
+            isUser ? "bg-primary px-4 py-2.5 text-primary-foreground" : "text-foreground",
           )}
         >
           {message.content}

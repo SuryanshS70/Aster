@@ -30,9 +30,7 @@ function save(list: Conversation[]) {
 export const mockConversationService: ConversationService = {
   async getConversations() {
     await mockDelay();
-    return load().sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+    return load().sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   },
 
   async getConversation(id: string) {

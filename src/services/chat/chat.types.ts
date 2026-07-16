@@ -1,22 +1,18 @@
-export type Role = "user" | "assistant" | "system";
+import type {
+  Message,
+  MessageStatus,
+  Role,
+  SendMessageInput,
+  StreamChunk,
+} from "@/contracts/messages";
 
-export type MessageStatus = "pending" | "streaming" | "complete" | "error";
-
-export type Message = {
-  id: string;
-  conversationId: string;
-  role: Role;
-  content: string;
-  createdAt: string;
-  status?: MessageStatus;
-};
-
-export type StreamChunk = { delta: string } | { done: true };
-
-export type SendMessageInput = {
-  conversationId: string;
-  content: string;
-};
+export type {
+  Message,
+  MessageStatus,
+  Role,
+  SendMessageInput,
+  StreamChunk,
+} from "@/contracts/messages";
 
 export class MessageRateLimitError extends Error {
   constructor(message = "Rate limit exceeded") {

@@ -15,7 +15,13 @@ type Props = {
   onRegenerate?: () => void;
 };
 
-export function MessageList({ conversationId, streamingText, state, onSuggest, onRegenerate }: Props) {
+export function MessageList({
+  conversationId,
+  streamingText,
+  state,
+  onSuggest,
+  onRegenerate,
+}: Props) {
   const { data, isLoading, isError, refetch } = useMessages(conversationId);
   const bottomRef = useRef<HTMLDivElement>(null);
 

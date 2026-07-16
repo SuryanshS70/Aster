@@ -24,8 +24,7 @@ export function SignupForm() {
     }
   }
 
-  const strength =
-    password.length === 0 ? "" : password.length < 8 ? "Too short" : "Looks good";
+  const strength = password.length === 0 ? "" : password.length < 8 ? "Too short" : "Looks good";
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -70,9 +69,7 @@ export function SignupForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        {strength && (
-          <p className="text-xs text-muted-foreground">{strength}</p>
-        )}
+        {strength && <p className="text-xs text-muted-foreground">{strength}</p>}
       </div>
 
       <Button type="submit" className="w-full" disabled={signup.isPending}>

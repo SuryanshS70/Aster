@@ -1,11 +1,6 @@
-export type Conversation = {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-};
+import type { Conversation, CreateConversationInput } from "@/contracts/conversations";
 
-export type CreateConversationInput = { title?: string };
+export type { Conversation, CreateConversationInput } from "@/contracts/conversations";
 
 export class ConversationNotFoundError extends Error {
   constructor(message = "Conversation not found") {

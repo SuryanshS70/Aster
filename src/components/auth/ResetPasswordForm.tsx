@@ -55,9 +55,7 @@ export function ResetPasswordForm() {
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
-        {mismatch && (
-          <p className="text-xs text-destructive">Passwords don't match.</p>
-        )}
+        {mismatch && <p className="text-xs text-destructive">Passwords don't match.</p>}
       </div>
 
       <Button type="submit" className="w-full" disabled={reset.isPending || mismatch}>

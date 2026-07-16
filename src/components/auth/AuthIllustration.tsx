@@ -25,9 +25,7 @@ export function AuthIllustration() {
             </svg>
           </div>
           <div className="space-y-3">
-            <p className="font-serif text-3xl leading-tight">
-              A calmer way to think with AI.
-            </p>
+            <p className="font-serif text-3xl leading-tight">A calmer way to think with AI.</p>
             <p className="text-sm opacity-80">
               Private conversations, thoughtful answers, and a clean space to focus.
             </p>

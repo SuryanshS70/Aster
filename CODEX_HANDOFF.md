@@ -41,7 +41,7 @@ Route protection lives in `src/routes/_authenticated.tsx` — it currently reads
 ### Fully implemented (frontend)
 
 - All routes, layouts, and 404 / error boundaries.
-- All auth forms (login, signup, forgot, reset) with Zod validation, password visibility toggles, loading + disabled states, and generic error messages.
+- All auth forms (login, signup, forgot, reset) with native field validation, loading + disabled states, and generic error messages. Shared Zod contracts live under `src/contracts/` but are not wired into the forms yet.
 - Chat UI: sidebar with conversation groups (Today / Yesterday / Earlier), rename + delete controls, new-chat button, mobile sheet, composer with auto-grow, Enter to send, Shift+Enter for newline, streaming cursor, stop button, regenerate + copy.
 - TanStack Query cache with per-conversation message keys — switching conversations never shows stale content because the message list is keyed on `conversationId`.
 - Design tokens + typography in `src/styles.css` (do not edit without a design brief).
@@ -167,7 +167,7 @@ Streaming endpoints should terminate with a `{ "done": true }` event so the clie
 
 The frontend currently uses **no** environment variables and contains no real secrets. When adding a real backend, expose only public config as `VITE_*` (e.g. `VITE_API_BASE_URL`). All private keys (LLM provider keys, DB credentials, JWT secrets, session secrets) must live server-side only.
 
-A sample `.env.example` (placeholders only) can be added when the real backend lands.
+The committed `.env.example` contains empty placeholders only; its server-side variables are reserved for later phases and are not used by the current frontend.
 
 ---
 
@@ -180,10 +180,11 @@ npm run build      # production build
 npm run build:dev  # dev-mode build (CI/preview)
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
+npm test           # Vitest baseline tests
 npm run format     # Prettier
 ```
 
-No test suite is set up yet.
+Vitest is configured with shared-contract tests and a smoke test for the current mock service layer. Backend integration and end-to-end tests do not exist yet.
 
 ---
 
@@ -194,7 +195,7 @@ No test suite is set up yet.
 - Assistant responses are a hardcoded template streamed token-by-token from `mockResponseTokens()` in `src/mocks/mock-data.ts`. There is no LLM.
 - `stopGeneration` sets an in-process flag; there is no server to abort.
 - Conversation rename uses `window.prompt` and delete uses `window.confirm` as intentionally minimal UI stand-ins — swap for a shadcn dialog if desired.
-- No test suite, no telemetry, no analytics.
+- Only baseline contract/service smoke tests; no backend integration tests, end-to-end tests, telemetry, or analytics.
 - No real security posture: RLS, authorization, ownership checks, rate limiting, and CSRF protection are all backend responsibilities that do not exist yet.
 
 **Confirmed:** the repository contains no API keys, service-role keys, database credentials, private tokens, hardcoded secrets, real user passwords, or direct browser calls to any LLM provider.

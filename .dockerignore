@@ -1,0 +1,16 @@
+.git
+.github
+.agents
+.codex
+.env
+.env.*
+!.env.example
+.nitro
+.output
+.tanstack
+.vinxi
+coverage
+dist
+node_modules
+npm-debug.log*
+*.log

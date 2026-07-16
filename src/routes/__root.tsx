@@ -87,8 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Aster — A calmer way to think with AI" },
       {
         property: "og:description",
-        content:
-          "Private conversations, thoughtful answers, and a clean space to focus.",
+        content: "Private conversations, thoughtful answers, and a clean space to focus.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

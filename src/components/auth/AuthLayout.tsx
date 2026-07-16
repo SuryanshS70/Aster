@@ -18,15 +18,11 @@ export function AuthLayout({ heading, subheading, children }: Props) {
             <h1 className="font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
               {heading}
             </h1>
-            {subheading && (
-              <p className="mt-3 text-muted-foreground">{subheading}</p>
-            )}
+            {subheading && <p className="mt-3 text-muted-foreground">{subheading}</p>}
             <div className="mt-8">{children}</div>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Aster
-        </p>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Aster</p>
       </div>
       <AuthIllustration />
     </div>
