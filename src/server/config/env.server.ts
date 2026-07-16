@@ -22,13 +22,23 @@ const serverEnvSchema = z
       .trim()
       .regex(/^[a-zA-Z0-9:_-]+$/)
       .default("aster"),
-    SESSION_SECRET: z.string().optional(),
+    SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
+    BETTER_AUTH_URL: z.string().url(),
+    TRUSTED_ORIGINS: z.string().default(""),
+    SMTP_HOST: z.string().trim().min(1).default("localhost"),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(1025),
+    SMTP_SECURE: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    SMTP_FROM: z.string().trim().min(1).default("Aster <no-reply@aster.local>"),
     GEMINI_API_KEY: z.string().optional(),
     GEMINI_MODEL: z.string().optional(),
   })
   .superRefine((env, context) => {
     validateUrlProtocol(env.DATABASE_URL, ["postgres:", "postgresql:"], "DATABASE_URL", context);
     validateUrlProtocol(env.REDIS_URL, ["redis:", "rediss:"], "REDIS_URL", context);
+    validateUrlProtocol(env.BETTER_AUTH_URL, ["http:", "https:"], "BETTER_AUTH_URL", context);
   });
 
 function validateUrlProtocol(
@@ -67,6 +77,16 @@ export function parseServerEnv(input: NodeJS.ProcessEnv): ServerEnv {
 export function getServerEnv(): ServerEnv {
   cachedEnv ??= parseServerEnv(process.env);
   return cachedEnv;
+}
+
+export function getTrustedOrigins(env: ServerEnv): string[] {
+  const origins = [new URL(env.BETTER_AUTH_URL).origin];
+  for (const value of env.TRUSTED_ORIGINS.split(",")) {
+    const origin = value.trim();
+    if (!origin) continue;
+    origins.push(new URL(origin).origin);
+  }
+  return [...new Set(origins)];
 }
 
 export function resetServerEnvForTests(): void {

@@ -1,8 +1,8 @@
 # Aster
 
-A calm, minimal AI chat interface. This repository contains the **frontend only** — the backend, database, authentication, and LLM integration are not implemented and will be added by Codex during the next phase.
+A calm, minimal AI chat application built as a TanStack Start modular monolith. Phase 3A added the server-side authentication foundation; conversation persistence and LLM integration remain future work.
 
-Everything data-related currently runs against an in-memory + `localStorage` mock service layer, so you can click through the entire UI (auth, chat streaming, conversation management) without any external services.
+The existing Lovable frontend still uses mock services for authentication, conversations, and chat, so it remains clickable without dependencies. Better Auth endpoints now exist on the server, but frontend authentication integration is deferred to Phase 3B.
 
 ## Tech stack
 
@@ -14,6 +14,9 @@ Everything data-related currently runs against an in-memory + `localStorage` moc
 - Zod shared validation contracts
 - Vitest
 - Lucide icons
+- Better Auth + Drizzle ORM + PostgreSQL
+- Redis authentication rate limiting
+- Nodemailer + Mailpit development email
 
 ## Getting started
 
@@ -26,6 +29,8 @@ npm run lint         # ESLint
 npm run typecheck    # TypeScript --noEmit
 npm test             # Vitest test suite
 npm run format       # Prettier
+npm run db:generate  # generate Drizzle migrations
+npm run db:migrate   # apply checked-in migrations
 ```
 
 Requires Node.js 20+.
@@ -49,13 +54,29 @@ src/
 │   ├── conversations/ ConversationService interface + mock implementation
 │   ├── chat/          ChatService interface + mock implementation
 │   └── index.ts       Public re-exports
+├── server/            Server-only config, database, Redis, HTTP, and auth
 ├── router.tsx         Router bootstrap
 ├── styles.css         Tailwind v4 theme + design tokens
 └── start.ts           TanStack Start entry
 ```
 
-## Backend status
+## Phase 3A status
 
-**The backend is not implemented.** All data operations flow through typed service interfaces (`AuthService`, `ConversationService`, `ChatService`) whose current implementations are mocks under `src/services/*/mock-*.service.ts`. Swap the exported service instance in each `*.service.ts` barrel to a real HTTP-backed implementation to go live — no component changes required.
+The application server now provides:
 
-See [`CODEX_HANDOFF.md`](./CODEX_HANDOFF.md) for the full backend integration brief, expected API contract, and known limitations.
+- Better Auth at `/api/auth/*`
+- PostgreSQL-backed users, credentials, verification records, and sessions
+- Required email verification and password-reset flows
+- Secure authentication cookies and CSRF/trusted-origin validation
+- Redis-backed authentication rate limiting
+- Mailpit email capture for local verification and reset testing
+
+Apply `drizzle/0000_familiar_the_anarchist.sql` with `npm run db:migrate` before using authentication. Copy `.env.example` to `.env`, replace its security placeholders, start PostgreSQL, Redis, and Mailpit with `docker compose up -d postgres redis mailpit`, then run `npm run dev`. Mailpit is available at `http://localhost:8025`.
+
+## Still mock-backed
+
+- The browser-facing `AuthService` and current client route protection
+- Conversations and messages
+- Simulated assistant streaming and generation cancellation
+
+Phase 3B must only connect the existing Lovable auth UI and route/session flows to Better Auth. It must not add conversation/message persistence, Gemini, chat streaming, optional providers, or additional infrastructure. See [`CODEX_HANDOFF.md`](./CODEX_HANDOFF.md) for the exact checkpoint and next-task scope.

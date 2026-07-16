@@ -1,201 +1,99 @@
-# Codex Handoff — Aster Frontend
+# Codex Handoff — Aster
 
-This document is the complete brief for wiring a real backend into the Aster frontend. The UI, routing, form validation, streaming behaviour, and state management are already implemented against a mock service layer. Your job is to replace the mock implementations with real HTTP-backed ones — the component tree does not need to change.
+## Current checkpoint
 
----
+Phase 3A (backend authentication) is complete. Aster remains one TanStack Start modular monolith. The existing Lovable frontend and all mock frontend services are unchanged; real frontend authentication is explicitly deferred to Phase 3B.
 
-## 1. Project overview
+## Implemented in Phase 3A
 
-Aster is a minimal AI chat app. Users sign in, create conversations, and stream responses from an assistant.
+- Better Auth `1.6.23` is mounted through the TanStack Start catch-all route at `/api/auth/*`.
+- Better Auth uses the Drizzle PostgreSQL adapter. Users, credentials, verification records, and sessions are database-backed.
+- Email/password signup and login, required email verification, logout, current-session lookup, forgot-password, and password reset are configured.
+- Password reset tokens expire after one hour, are single-use, and a successful reset revokes existing sessions.
+- Auth cookies use the `aster` prefix, `HttpOnly`, `SameSite=Lax`, and `Path=/`; `Secure` is enabled when `NODE_ENV=production`.
+- Mutation requests have TanStack same-origin CSRF middleware plus auth-specific exact-origin validation against `BETTER_AUTH_URL` and `TRUSTED_ORIGINS`.
+- Existing Zod auth contracts validate and normalize request bodies. Email addresses are trimmed and lowercased before Better Auth receives them.
+- Login failures and forgot-password requests return generic responses. Redirect targets accepted by the auth wrapper must be internal paths.
+- Better Auth rate limits auth endpoints using Redis. The Redis adapter uses an atomic Lua `consume` operation to prevent concurrent-request bypasses.
+- Nodemailer sends verification and reset messages to Mailpit in development. Sensitive tokens, cookies, authorization headers, and passwords are not logged.
+- Zod was aligned to version 4 because Better Auth uses Zod 4 APIs.
 
-**Frontend stack:** React 19, TypeScript (strict), Vite 8, TanStack Start (file-based routing) + TanStack Query, Tailwind v4, shadcn/ui, Zod.
+## Database migration
 
-### Routes
+Checked-in migration: `drizzle/0000_familiar_the_anarchist.sql`, with Drizzle journal and snapshot metadata.
 
-| Path | Auth | Purpose |
-| --- | --- | --- |
-| `/` | — | Redirects to `/chat` (signed in) or `/login` |
-| `/login` | Public | Email + password login |
-| `/signup` | Public | Create account |
-| `/forgot-password` | Public | Request reset email |
-| `/reset-password` | Public | Submit new password with token |
-| `/chat` | Protected | New-chat landing (`EmptyChat`) |
-| `/chat/$conversationId` | Protected | Conversation view + streaming composer |
-| `/settings` | Protected | Profile + sign out |
-| `*` | — | 404 handled by root `notFoundComponent` |
+It creates Better Auth's recommended tables:
 
-Route protection lives in `src/routes/_authenticated.tsx` — it currently reads `useSession()` and redirects to `/login` if there is no session. Swap this out for the same shape once real auth exists; no other change is required.
+- `user`
+- `session`
+- `account`
+- `verification`
 
-### Main user flows
+Foreign keys cascade from `session.user_id` and `account.user_id` to `user.id`. Session tokens and stored email values are unique. A defensive `user_email_lower_unique` functional index enforces case-insensitive email uniqueness.
 
-1. Sign up / log in → `/chat`.
-2. Click "New chat" or a suggestion → creates a conversation → navigates to `/chat/$id` → first message is sent automatically (passed via `search.initial`).
-3. Send a message → optimistic user bubble → streaming assistant bubble → invalidates `messages` + `conversations` queries.
-4. Stop, regenerate, copy, rename, delete are all wired through the service layer.
-5. Sign out clears the query cache and returns to `/login`.
+No conversation or message tables were added.
 
----
+## Server environment variables
 
-## 2. Current implementation
+All values are documented with placeholders in `.env.example`.
 
-### Fully implemented (frontend)
+Required authentication/runtime values:
 
-- All routes, layouts, and 404 / error boundaries.
-- All auth forms (login, signup, forgot, reset) with native field validation, loading + disabled states, and generic error messages. Shared Zod contracts live under `src/contracts/` but are not wired into the forms yet.
-- Chat UI: sidebar with conversation groups (Today / Yesterday / Earlier), rename + delete controls, new-chat button, mobile sheet, composer with auto-grow, Enter to send, Shift+Enter for newline, streaming cursor, stop button, regenerate + copy.
-- TanStack Query cache with per-conversation message keys — switching conversations never shows stale content because the message list is keyed on `conversationId`.
-- Design tokens + typography in `src/styles.css` (do not edit without a design brief).
+- `DATABASE_URL`
+- `REDIS_URL`
+- `REDIS_KEY_PREFIX`
+- `SESSION_SECRET` (at least 32 characters; use a random production secret)
+- `BETTER_AUTH_URL` (the externally reachable application origin)
+- `TRUSTED_ORIGINS` (comma-separated additional exact origins)
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_FROM`
 
-### Currently mocked
+Existing runtime values remain: `NODE_ENV`, `HOST`, `PORT`, `LOG_LEVEL`, `REQUEST_BODY_LIMIT_BYTES`, and `SHUTDOWN_TIMEOUT_MS`. `GEMINI_API_KEY` and `GEMINI_MODEL` remain unused placeholders for a later phase and must never enter frontend code.
 
-Every service call resolves via an in-memory + `localStorage`-backed mock. All mock seed data lives in `src/mocks/mock-data.ts` and is only imported by mock service files — never by components.
+## Local setup and testing
 
-- **Auth:** `mockAuthService` persists a session in `localStorage` under `aster.session.v1`. Any email/password combo is accepted; the "user" is derived from the email.
-- **Conversations:** `mockConversationService` persists in `aster.conversations.v1`.
-- **Chat:** `mockChatService` persists messages under `aster.messages.v1`. `sendMessage()` returns an `AsyncIterable<StreamChunk>` that yields token-sized deltas with small delays to simulate streaming. `stopGeneration()` sets an abort flag consumed by the generator. `regenerateResponse()` drops the last assistant message and re-streams.
+1. Copy `.env.example` to `.env` and replace the local PostgreSQL password and `SESSION_SECRET` placeholders.
+2. Start dependencies: `docker compose up -d postgres redis mailpit`.
+3. Apply the checked-in migration: `npm run db:migrate`.
+4. Start Aster: `npm run dev`.
+5. Open Aster at the origin configured by `BETTER_AUTH_URL` (the Vite dev default in this repository is `http://localhost:8080`).
+6. Open Mailpit at `http://localhost:8025` to follow verification and password-reset links.
 
----
+To run the whole application in containers, set non-placeholder `POSTGRES_PASSWORD` and `SESSION_SECRET`, run `docker compose up --build`, and apply `npm run db:migrate` against that database before testing signup. Database migrations are not automatically run by the app container.
 
-## 3. Service architecture
+Checkpoint verification on 2026-07-17:
 
-Components and hooks import **only** from `@/services` (barrel) or from the hooks in `src/hooks/`. Components never import from `src/mocks/`.
+- `npm run typecheck` — passed
+- `npm run lint` — passed
+- `npm test` — passed: 8 files, 23 tests
+- `npm run build` — passed with the Node/Nitro production target
+- `docker compose config --quiet` — passed; this sandbox only warned that the user's Docker CLI config file was unreadable
 
-To go live, replace the exported instance in each barrel with an HTTP implementation that satisfies the same interface. The interfaces are the contract — do not widen them at the component level.
+Tests cover environment validation, existing health/error infrastructure, auth request validation and origin rejection, generic login and forgot-password behavior, email normalization and duplicate signup, email verification, session restoration, logout revocation, invalid/reused reset tokens, reset-triggered session revocation, rate limiting, and Redis rate-limit serialization.
 
-### AuthService — `src/services/auth/auth.types.ts`
+## Explicitly deferred
 
-```ts
-interface AuthService {
-  getCurrentUser(): Promise<Session | null>;
-  login(input: LoginInput): Promise<Session>;
-  signup(input: SignupInput): Promise<Session>;
-  logout(): Promise<void>;
-  requestPasswordReset(email: string): Promise<void>;
-  resetPassword(input: ResetPasswordInput): Promise<void>;
-  onAuthChange(cb: (session: Session | null) => void): () => void;
-}
-```
+The exact minimal Phase 3B objective is to replace only the mock browser `AuthService` and connect the existing Lovable auth forms, session state, redirects, logout, and protected-route checks to the completed Better Auth backend:
 
-- Mock: `src/services/auth/mock-auth.service.ts`
-- Real implementation goes in a new file, e.g. `src/services/auth/http-auth.service.ts`, and is wired via `src/services/auth/auth.service.ts`.
+- Replace only the mock `AuthService` with an HTTP/Better Auth implementation.
+- Connect login, signup, logout, forgot-password, and reset-password forms.
+- Add password visibility toggles without changing the existing design.
+- Restore sessions after refresh and protect authenticated routes with server session checks.
+- Redirect authenticated users away from auth pages, validate redirect destinations, show controlled errors, and clear auth-related TanStack Query state on logout.
+- Add frontend/session/protected-route tests and a client-bundle secret scan.
 
-### ConversationService — `src/services/conversations/conversation.types.ts`
+Also deferred: conversation/message tables and APIs, Gemini, chat streaming, general rate limiting, and replacing conversation/chat mock services.
 
-```ts
-interface ConversationService {
-  getConversations(): Promise<Conversation[]>;
-  createConversation(input?: CreateConversationInput): Promise<Conversation>;
-  getConversation(id: string): Promise<Conversation>;
-  renameConversation(id: string, title: string): Promise<Conversation>;
-  deleteConversation(id: string): Promise<void>;
-}
-```
+Phase 3B must not introduce a separate backend, new infrastructure, optional authentication providers, production email delivery, unrelated refactors, or design changes. Implement only what is necessary to complete frontend authentication integration and its tests.
 
-- Mock: `src/services/conversations/mock-conversation.service.ts`
-- Wire real impl via `src/services/conversations/conversation.service.ts`.
+## Known limitations and next-thread notes
 
-### ChatService — `src/services/chat/chat.types.ts`
-
-```ts
-interface ChatService {
-  getMessages(conversationId: string): Promise<Message[]>;
-  sendMessage(input: SendMessageInput): AsyncIterable<StreamChunk>;
-  stopGeneration(conversationId: string): Promise<void>;
-  regenerateResponse(conversationId: string): AsyncIterable<StreamChunk>;
-}
-
-type StreamChunk = { delta: string } | { done: true };
-```
-
-- Mock: `src/services/chat/mock-chat.service.ts`
-- Wire real impl via `src/services/chat/chat.service.ts`.
-
-Streaming is expressed as `AsyncIterable<StreamChunk>` deliberately — an HTTP implementation can adapt an SSE or fetch/streams response by yielding `{ delta }` chunks and a final `{ done: true }`. `stopGeneration` should abort the in-flight request (e.g. `AbortController`).
-
-### Shared types (single source of truth)
-
-- `User`, `Session`, `LoginInput`, `SignupInput`, `ResetPasswordInput`, `UnauthorizedError`, `RateLimitError` → `src/services/auth/auth.types.ts`
-- `Conversation`, `CreateConversationInput`, `ConversationNotFoundError` → `src/services/conversations/conversation.types.ts`
-- `Message`, `Role`, `MessageStatus`, `SendMessageInput`, `StreamChunk`, `MessageRateLimitError` → `src/services/chat/chat.types.ts`
-
-All re-exported from `src/services/index.ts`. Do not duplicate these types elsewhere.
-
----
-
-## 4. Expected backend integration
-
-Codex is expected to implement:
-
-- Real authentication (session/cookie or JWT — the frontend does not care as long as `getCurrentUser` and `onAuthChange` reflect state).
-- Protected backend routes with conversation ownership checks.
-- Persistent database storage for users, conversations, messages.
-- LLM integration with server-side streaming (SSE or chunked fetch).
-- Server-side input validation (Zod schemas on the client should be mirrored on the server; never trust the client).
-- Rate limiting (map 429 → `RateLimitError` / `MessageRateLimitError`).
-- Structured error responses that the frontend can surface as generic error messages.
-
-The frontend must not call an LLM provider directly from the browser.
-
----
-
-## 5. Recommended backend API contract
-
-These routes are suggestions, not requirements — the only hard contract is the service interfaces above. If you follow this shape, the HTTP implementations of each service become almost mechanical.
-
-| Method + Path | Frontend service method | Request | Response | Notable errors |
-| --- | --- | --- | --- | --- |
-| `GET /api/me` | `AuthService.getCurrentUser` | — | `Session \| null` | 401 → `null` |
-| `POST /api/auth/login` | `AuthService.login` | `LoginInput` | `Session` | 401 → `UnauthorizedError` |
-| `POST /api/auth/signup` | `AuthService.signup` | `SignupInput` | `Session` | 409 email exists |
-| `POST /api/auth/logout` | `AuthService.logout` | — | `204` | — |
-| `POST /api/auth/password-reset` | `AuthService.requestPasswordReset` | `{ email }` | `204` | Always 204 (don't leak account existence) |
-| `POST /api/auth/password-reset/confirm` | `AuthService.resetPassword` | `ResetPasswordInput` | `204` | 400 invalid/expired token |
-| `GET /api/conversations` | `ConversationService.getConversations` | — | `Conversation[]` | 401 |
-| `POST /api/conversations` | `ConversationService.createConversation` | `CreateConversationInput` | `Conversation` | 401 |
-| `GET /api/conversations/:id` | `ConversationService.getConversation` | — | `Conversation` | 404 → `ConversationNotFoundError` |
-| `PATCH /api/conversations/:id` | `ConversationService.renameConversation` | `{ title }` | `Conversation` | 404 |
-| `DELETE /api/conversations/:id` | `ConversationService.deleteConversation` | — | `204` | 404 |
-| `GET /api/conversations/:id/messages` | `ChatService.getMessages` | — | `Message[]` | 404 |
-| `POST /api/chat/stream` | `ChatService.sendMessage` | `SendMessageInput` | SSE / chunked stream of `StreamChunk` | 429 → `MessageRateLimitError` |
-| `POST /api/messages/:messageId/regenerate` (or `/api/conversations/:id/regenerate`) | `ChatService.regenerateResponse` | — | SSE / chunked stream of `StreamChunk` | 429 |
-
-Streaming endpoints should terminate with a `{ "done": true }` event so the client's `for await` loop exits cleanly. Aborting a stream is a client-side `AbortController.abort()` — the server just needs to handle the closed connection.
-
----
-
-## 6. Environment variables
-
-The frontend currently uses **no** environment variables and contains no real secrets. When adding a real backend, expose only public config as `VITE_*` (e.g. `VITE_API_BASE_URL`). All private keys (LLM provider keys, DB credentials, JWT secrets, session secrets) must live server-side only.
-
-The committed `.env.example` contains empty placeholders only; its server-side variables are reserved for later phases and are not used by the current frontend.
-
----
-
-## 7. Commands
-
-```bash
-npm install        # install
-npm run dev        # dev server on http://localhost:8080
-npm run build      # production build
-npm run build:dev  # dev-mode build (CI/preview)
-npm run lint       # ESLint
-npm run typecheck  # tsc --noEmit
-npm test           # Vitest baseline tests
-npm run format     # Prettier
-```
-
-Vitest is configured with shared-contract tests and a smoke test for the current mock service layer. Backend integration and end-to-end tests do not exist yet.
-
----
-
-## 8. Known limitations / remaining mock-only behaviour
-
-- All auth is mocked — any email/password logs in, "password reset" is a no-op that resolves successfully.
-- Conversations, messages, and sessions persist only in `localStorage`, per browser.
-- Assistant responses are a hardcoded template streamed token-by-token from `mockResponseTokens()` in `src/mocks/mock-data.ts`. There is no LLM.
-- `stopGeneration` sets an in-process flag; there is no server to abort.
-- Conversation rename uses `window.prompt` and delete uses `window.confirm` as intentionally minimal UI stand-ins — swap for a shadcn dialog if desired.
-- Only baseline contract/service smoke tests; no backend integration tests, end-to-end tests, telemetry, or analytics.
-- No real security posture: RLS, authorization, ownership checks, rate limiting, and CSRF protection are all backend responsibilities that do not exist yet.
-
-**Confirmed:** the repository contains no API keys, service-role keys, database credentials, private tokens, hardcoded secrets, real user passwords, or direct browser calls to any LLM provider.
+- The browser still uses `mockAuthService`; the new backend endpoints are not yet called by the UI. Current frontend route protection therefore still trusts mock client state.
+- Backend tests use Better Auth's isolated memory adapter; no automated live integration test currently starts PostgreSQL, Redis, or Mailpit. Production configuration uses Drizzle/PostgreSQL and Redis.
+- Mailpit is development-only. A production email provider and delivery/retry strategy are not configured.
+- The migration must be applied manually before auth endpoints can use PostgreSQL.
+- `npm install` reports four moderate transitive dependency audit findings; no forced or breaking audit upgrade was applied.
+- The production build emits only the pre-existing advisory that Vite now supports TypeScript path resolution natively while this project still uses `vite-tsconfig-paths`.
+- Do not redesign or replace the Lovable component tree. Start the next task at Phase 3B frontend auth integration and keep all authenticated user IDs sourced only from verified server sessions.
