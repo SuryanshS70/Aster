@@ -1,10 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/mocks/mock-data", () => ({
-  mockDelay: async () => undefined,
-  mockResponseTokens: () => ["Simulated", " response"],
-}));
-
 import { chatService } from "./chat/chat.service";
 import { conversationService } from "./conversations/conversation.service";
 
@@ -66,12 +61,17 @@ describe("persistent frontend service mapping", () => {
     expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "DELETE" });
   });
 
-  it("loads messages and persists both sides of the simulated response", async () => {
+  it("loads messages and maps one send to the generation endpoint", async () => {
     fetchMock
       .mockResolvedValueOnce(Response.json([message("user", "Hello")]))
-      .mockResolvedValueOnce(Response.json(message("user", "Hello"), { status: 201 }))
       .mockResolvedValueOnce(
-        Response.json(message("assistant", "Simulated response"), { status: 201 }),
+        Response.json(
+          {
+            user: message("user", "Hello"),
+            assistant: message("assistant", "Gemini response"),
+          },
+          { status: 201 },
+        ),
       );
 
     await chatService.getMessages(conversation.id);
@@ -83,19 +83,14 @@ describe("persistent frontend service mapping", () => {
       chunks.push(chunk);
     }
 
-    expect(chunks).toEqual([{ delta: "Simulated" }, { delta: " response" }, { done: true }]);
+    expect(chunks).toEqual([{ delta: "Gemini response" }, { done: true }]);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       "/api/conversations/conv_1/messages",
-      "/api/conversations/conv_1/messages",
-      "/api/conversations/conv_1/messages",
+      "/api/conversations/conv_1/generate",
     ]);
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
-      role: "user",
-      content: "Hello",
+      message: "Hello",
     });
-    expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).toEqual({
-      role: "assistant",
-      content: "Simulated response",
-    });
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "POST" });
   });
 });

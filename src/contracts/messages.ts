@@ -30,6 +30,12 @@ export const createMessageInputSchema = z
   })
   .strict();
 
+export const generateMessageInputSchema = z
+  .object({
+    message: messageContentSchema,
+  })
+  .strict();
+
 export const messageSchema = z
   .object({
     id: messageIdSchema,
@@ -43,6 +49,13 @@ export const messageSchema = z
 
 export const messageListSchema = z.array(messageSchema);
 
+export const generateMessageResponseSchema = z
+  .object({
+    user: messageSchema,
+    assistant: messageSchema,
+  })
+  .strict();
+
 export const streamChunkSchema = z.union([
   z.object({ delta: z.string() }).strict(),
   z.object({ done: z.literal(true) }).strict(),
@@ -53,4 +66,6 @@ export type MessageStatus = z.infer<typeof messageStatusSchema>;
 export type Message = z.infer<typeof messageSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type CreateMessageInput = z.infer<typeof createMessageInputSchema>;
+export type GenerateMessageInput = z.infer<typeof generateMessageInputSchema>;
+export type GenerateMessageResponse = z.infer<typeof generateMessageResponseSchema>;
 export type StreamChunk = z.infer<typeof streamChunkSchema>;

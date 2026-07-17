@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseServerEnv } from "./env.server";
+import { getGeminiConfig, parseServerEnv } from "./env.server";
 
 const validEnv = {
   NODE_ENV: "test",
@@ -29,5 +29,21 @@ describe("server environment validation", () => {
     expect(() =>
       parseServerEnv({ ...validEnv, DATABASE_URL: "https://db.example.test/aster" }),
     ).toThrow("Invalid server environment: DATABASE_URL");
+  });
+
+  it("requires non-empty Gemini configuration only when generation is used", () => {
+    const env = parseServerEnv({ ...validEnv, GEMINI_API_KEY: "", GEMINI_MODEL: "" });
+    expect(() => getGeminiConfig(env)).toThrow(
+      "Invalid server environment: GEMINI_API_KEY, GEMINI_MODEL",
+    );
+    expect(
+      getGeminiConfig(
+        parseServerEnv({
+          ...validEnv,
+          GEMINI_API_KEY: "test-api-key",
+          GEMINI_MODEL: "test-model",
+        }),
+      ),
+    ).toEqual({ apiKey: "test-api-key", model: "test-model" });
   });
 });

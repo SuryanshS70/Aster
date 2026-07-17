@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Conversation, CreateMessageInput, Message } from "../../contracts";
+import type { GeminiHistoryMessage } from "../gemini/gemini.server";
 import { createChatApi, type ChatStore } from "./chat.server";
 
 class MemoryChatStore implements ChatStore {
@@ -74,6 +75,30 @@ class MemoryChatStore implements ChatStore {
     this.messages.set(conversationId, [...(this.messages.get(conversationId) ?? []), message]);
     return message;
   }
+
+  async getRecentMessages(userId: string, conversationId: string, limit: number) {
+    const existing = await this.listMessages(userId, conversationId);
+    return existing?.slice(-limit) ?? null;
+  }
+
+  async persistGeneratedMessages(
+    userId: string,
+    conversationId: string,
+    userContent: string,
+    assistantContent: string,
+  ) {
+    if (!(await this.getConversation(userId, conversationId))) return null;
+    const user = await this.createMessage(userId, conversationId, {
+      role: "user",
+      content: userContent,
+    });
+    const assistant = await this.createMessage(userId, conversationId, {
+      role: "assistant",
+      content: assistantContent,
+    });
+    if (!user || !assistant) return null;
+    return { user, assistant };
+  }
 }
 
 function request(method: string, path: string, userId?: string, body?: unknown) {
@@ -87,11 +112,15 @@ function request(method: string, path: string, userId?: string, body?: unknown) 
   });
 }
 
-function setup() {
+function setup(
+  generate: (history: GeminiHistoryMessage[], message: string) => Promise<string> = async () =>
+    "Generated response",
+) {
   const store = new MemoryChatStore();
   const api = createChatApi({
     store,
     resolveUserId: async (incoming) => incoming.headers.get("x-test-user"),
+    generate,
     bodyLimitBytes: 16_384,
   });
   return { api, store };
@@ -191,5 +220,97 @@ describe("authenticated conversation API", () => {
       "list-a",
     );
     await expect(listed.json()).resolves.toEqual([]);
+  });
+
+  it("rejects unauthenticated generation requests", async () => {
+    const { api } = setup();
+    const response = await api.generation(
+      request("POST", "/api/conversations/conv_1/generate", undefined, { message: "Hello" }),
+      "anonymous-generation",
+      "conv_1",
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "UNAUTHORIZED" } });
+  });
+
+  it("does not generate for a conversation owned by another user", async () => {
+    const generate = vi.fn(async () => "Private response");
+    const { api } = setup(generate);
+    const created = (await (
+      await api.conversations(
+        request("POST", "/api/conversations", "user-b", { title: "Private" }),
+        "create-b",
+      )
+    ).json()) as Conversation;
+
+    const response = await api.generation(
+      request("POST", `/api/conversations/${created.id}/generate`, "user-a", {
+        message: "Do not answer",
+      }),
+      "foreign-generation",
+      created.id,
+    );
+    expect(response.status).toBe(404);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("uses the latest 20 messages and persists the generated pair", async () => {
+    const generate = vi.fn(
+      async (_history: GeminiHistoryMessage[], _message: string) => "Gemini answer",
+    );
+    const { api, store } = setup(generate);
+    const created = (await (
+      await api.conversations(request("POST", "/api/conversations", "user-a", {}), "create")
+    ).json()) as Conversation;
+    for (let index = 0; index < 21; index += 1) {
+      await store.createMessage("user-a", created.id, {
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `History ${index}`,
+      });
+    }
+
+    const response = await api.generation(
+      request("POST", `/api/conversations/${created.id}/generate`, "user-a", {
+        message: "New question",
+      }),
+      "generate",
+      created.id,
+    );
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      user: { role: "user", content: "New question" },
+      assistant: { role: "assistant", content: "Gemini answer" },
+    });
+    expect(generate).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ content: "History 20" })]),
+      "New question",
+    );
+    expect(generate.mock.calls[0]?.[0]).toHaveLength(20);
+    await expect(store.listMessages("user-a", created.id)).resolves.toHaveLength(23);
+  });
+
+  it("returns a controlled error and persists nothing when Gemini fails", async () => {
+    const { api, store } = setup(async () => {
+      throw new Error("provider detail must stay private");
+    });
+    const created = (await (
+      await api.conversations(request("POST", "/api/conversations", "user-a", {}), "create")
+    ).json()) as Conversation;
+
+    const response = await api.generation(
+      request("POST", `/api/conversations/${created.id}/generate`, "user-a", {
+        message: "Question",
+      }),
+      "provider-failure",
+      created.id,
+    );
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "SERVICE_UNAVAILABLE",
+        message: "Unable to generate a response. Please try again.",
+      },
+    });
+    await expect(store.listMessages("user-a", created.id)).resolves.toEqual([]);
   });
 });

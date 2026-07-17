@@ -25,6 +25,7 @@ import { Route as ApiConversationsConversationIdRouteImport } from './routes/api
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedChatConversationIdRouteImport } from './routes/_authenticated.chat.$conversationId'
 import { Route as ApiConversationsConversationIdMessagesRouteImport } from './routes/api.conversations.$conversationId.messages'
+import { Route as ApiConversationsConversationIdGenerateRouteImport } from './routes/api.conversations.$conversationId.generate'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -108,6 +109,12 @@ const ApiConversationsConversationIdMessagesRoute =
     path: '/messages',
     getParentRoute: () => ApiConversationsConversationIdRoute,
   } as any)
+const ApiConversationsConversationIdGenerateRoute =
+  ApiConversationsConversationIdGenerateRouteImport.update({
+    id: '/generate',
+    path: '/generate',
+    getParentRoute: () => ApiConversationsConversationIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
   '/chat/': typeof AuthenticatedChatIndexRoute
+  '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
 }
 export interface FileRoutesByTo {
@@ -140,6 +148,7 @@ export interface FileRoutesByTo {
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
   '/chat': typeof AuthenticatedChatIndexRoute
+  '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
 }
 export interface FileRoutesById {
@@ -159,6 +168,7 @@ export interface FileRoutesById {
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
   '/_authenticated/chat/': typeof AuthenticatedChatIndexRoute
+  '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
 }
 export interface FileRouteTypes {
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/api/health/live'
     | '/api/health/ready'
     | '/chat/'
+    | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/api/health/live'
     | '/api/health/ready'
     | '/chat'
+    | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
   id:
     | '__root__'
@@ -212,6 +224,7 @@ export interface FileRouteTypes {
     | '/api/health/live'
     | '/api/health/ready'
     | '/_authenticated/chat/'
+    | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
   fileRoutesById: FileRoutesById
 }
@@ -342,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiConversationsConversationIdMessagesRouteImport
       parentRoute: typeof ApiConversationsConversationIdRoute
     }
+    '/api/conversations/$conversationId/generate': {
+      id: '/api/conversations/$conversationId/generate'
+      path: '/generate'
+      fullPath: '/api/conversations/$conversationId/generate'
+      preLoaderRoute: typeof ApiConversationsConversationIdGenerateRouteImport
+      parentRoute: typeof ApiConversationsConversationIdRoute
+    }
   }
 }
 
@@ -373,11 +393,14 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 )
 
 interface ApiConversationsConversationIdRouteChildren {
+  ApiConversationsConversationIdGenerateRoute: typeof ApiConversationsConversationIdGenerateRoute
   ApiConversationsConversationIdMessagesRoute: typeof ApiConversationsConversationIdMessagesRoute
 }
 
 const ApiConversationsConversationIdRouteChildren: ApiConversationsConversationIdRouteChildren =
   {
+    ApiConversationsConversationIdGenerateRoute:
+      ApiConversationsConversationIdGenerateRoute,
     ApiConversationsConversationIdMessagesRoute:
       ApiConversationsConversationIdMessagesRoute,
   }

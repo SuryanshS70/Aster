@@ -32,8 +32,16 @@ const serverEnvSchema = z
       .default("false")
       .transform((value) => value === "true"),
     SMTP_FROM: z.string().trim().min(1).default("Aster <no-reply@aster.local>"),
-    GEMINI_API_KEY: z.string().optional(),
-    GEMINI_MODEL: z.string().optional(),
+    GEMINI_API_KEY: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined),
+    GEMINI_MODEL: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined),
   })
   .superRefine((env, context) => {
     validateUrlProtocol(env.DATABASE_URL, ["postgres:", "postgresql:"], "DATABASE_URL", context);
@@ -61,6 +69,8 @@ function validateUrlProtocol(
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
+export type GeminiConfig = { apiKey: string; model: string };
+
 let cachedEnv: ServerEnv | undefined;
 
 export function parseServerEnv(input: NodeJS.ProcessEnv): ServerEnv {
@@ -87,6 +97,19 @@ export function getTrustedOrigins(env: ServerEnv): string[] {
     origins.push(new URL(origin).origin);
   }
   return [...new Set(origins)];
+}
+
+export function getGeminiConfig(env: ServerEnv = getServerEnv()): GeminiConfig {
+  const result = z
+    .object({
+      apiKey: z.string().min(1),
+      model: z.string().min(1),
+    })
+    .safeParse({ apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL });
+  if (!result.success) {
+    throw new Error("Invalid server environment: GEMINI_API_KEY, GEMINI_MODEL");
+  }
+  return result.data;
 }
 
 export function resetServerEnvForTests(): void {

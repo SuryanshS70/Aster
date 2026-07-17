@@ -5,11 +5,14 @@ import {
   conversationIdSchema,
   createConversationInputSchema,
   createMessageInputSchema,
+  generateMessageInputSchema,
+  messageContentSchema,
   renameConversationInputSchema,
   type Conversation,
   type CreateMessageInput,
   type Message,
 } from "../../contracts";
+import type { GeminiHistoryMessage } from "../gemini/gemini.server";
 import { getServerEnv } from "../config/env.server";
 import { getDatabase } from "../db/client.server";
 import { conversations, messages } from "../db/schema";
@@ -29,6 +32,17 @@ export interface ChatStore {
     conversationId: string,
     input: CreateMessageInput,
   ): Promise<Message | null>;
+  getRecentMessages(
+    userId: string,
+    conversationId: string,
+    limit: number,
+  ): Promise<Message[] | null>;
+  persistGeneratedMessages(
+    userId: string,
+    conversationId: string,
+    userContent: string,
+    assistantContent: string,
+  ): Promise<{ user: Message; assistant: Message } | null>;
 }
 
 type ConversationRow = typeof conversations.$inferSelect;
@@ -146,6 +160,70 @@ export function createChatStore(database: PostgresJsDatabase = getDatabase()): C
         .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
       return toMessage(row);
     },
+
+    async getRecentMessages(userId, conversationId, limit) {
+      const [owned] = await database
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+        .limit(1);
+      if (!owned) return null;
+
+      const rows = await database
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, conversationId))
+        .orderBy(desc(messages.createdAt), desc(messages.id))
+        .limit(limit);
+      return rows.reverse().map(toMessage);
+    },
+
+    async persistGeneratedMessages(userId, conversationId, userContent, assistantContent) {
+      return database.transaction(async (transaction) => {
+        const [owned] = await transaction
+          .select({ id: conversations.id })
+          .from(conversations)
+          .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+          .limit(1);
+        if (!owned) return null;
+
+        const userCreatedAt = new Date();
+        const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1);
+        const inserted = await transaction
+          .insert(messages)
+          .values([
+            {
+              id: crypto.randomUUID(),
+              conversationId,
+              role: "user",
+              content: userContent,
+              createdAt: userCreatedAt,
+            },
+            {
+              id: crypto.randomUUID(),
+              conversationId,
+              role: "assistant",
+              content: assistantContent,
+              createdAt: assistantCreatedAt,
+            },
+          ])
+          .returning();
+        const userMessage = inserted.find((message) => message.role === "user");
+        const assistantMessage = inserted.find((message) => message.role === "assistant");
+        if (!userMessage || !assistantMessage) {
+          throw new Error("Generation message insert did not return both rows");
+        }
+
+        await transaction
+          .update(conversations)
+          .set({
+            title: userContent.trim().slice(0, 60),
+            updatedAt: assistantCreatedAt,
+          })
+          .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
+        return { user: toMessage(userMessage), assistant: toMessage(assistantMessage) };
+      });
+    },
   };
 }
 
@@ -184,13 +262,22 @@ function notFound(): never {
   throw new ApiError(404, "NOT_FOUND", "Conversation not found");
 }
 
+type GenerateWithGemini = (history: GeminiHistoryMessage[], message: string) => Promise<string>;
+
+async function generateWithGemini(history: GeminiHistoryMessage[], message: string) {
+  const { createGeminiProvider } = await import("../gemini/gemini.server");
+  return createGeminiProvider().generate(history, message);
+}
+
 export function createChatApi({
   store,
   resolveUserId = resolveVerifiedUserId,
+  generate = generateWithGemini,
   bodyLimitBytes = getServerEnv().REQUEST_BODY_LIMIT_BYTES,
 }: {
   store: ChatStore;
   resolveUserId?: ResolveUserId;
+  generate?: GenerateWithGemini;
   bodyLimitBytes?: number;
 }) {
   return {
@@ -265,6 +352,49 @@ export function createChatApi({
         throw new ApiError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
       });
     },
+
+    generation(request: Request, requestId: string, rawConversationId: string): Promise<Response> {
+      return withApiErrorBoundary(requestId, async () => {
+        const userId = await requireUserId(request, resolveUserId);
+        const conversationId = parseInput(conversationIdSchema, rawConversationId);
+        if (request.method !== "POST") {
+          throw new ApiError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        const input = parseInput(
+          generateMessageInputSchema,
+          await readJsonBody(request, bodyLimitBytes),
+        );
+        const history = await store.getRecentMessages(userId, conversationId, 20);
+        if (!history) notFound();
+
+        let generated: string;
+        try {
+          generated = await generate(history, input.message);
+        } catch {
+          throw new ApiError(
+            502,
+            "SERVICE_UNAVAILABLE",
+            "Unable to generate a response. Please try again.",
+          );
+        }
+        const assistantContent = messageContentSchema.safeParse(generated);
+        if (!assistantContent.success) {
+          throw new ApiError(
+            502,
+            "SERVICE_UNAVAILABLE",
+            "Unable to generate a response. Please try again.",
+          );
+        }
+
+        const persisted = await store.persistGeneratedMessages(
+          userId,
+          conversationId,
+          input.message,
+          assistantContent.data,
+        );
+        return jsonResponse(persisted ?? notFound(), { status: 201 });
+      });
+    },
   };
 }
 
@@ -293,4 +423,12 @@ export function handleConversationMessagesRequest(
   conversationId: string,
 ) {
   return getProductionApi().conversationMessages(request, requestId, conversationId);
+}
+
+export function handleConversationGenerationRequest(
+  request: Request,
+  requestId: string,
+  conversationId: string,
+) {
+  return getProductionApi().generation(request, requestId, conversationId);
 }

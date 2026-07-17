@@ -1,111 +1,76 @@
-# Codex Handoff — Aster
+# Codex Handoff - Aster
 
 ## Current checkpoint
 
-Minimal conversation and message persistence is complete. Aster remains a TanStack Start modular
-monolith and preserves the existing Lovable chat interface.
+Minimal Gemini integration is complete. Aster remains a TanStack Start modular monolith with the existing Better Auth session flow, PostgreSQL conversation/message persistence, and Lovable chat interface.
 
-Authentication continues to use the Phase 3A/3B Better Auth architecture. Conversations and
-messages now persist in PostgreSQL and are always scoped to the verified session user. The existing
-simulated assistant response remains temporary and is persisted after it finishes.
+The browser sends one non-streaming generation request. The authenticated server validates ownership, supplies a bounded conversation history to Gemini, and persists the returned user and assistant messages together.
 
 ## Implemented
 
-- Added only `conversations` and `messages` tables.
-- Conversations contain `id`, `userId`, `title`, `createdAt`, and `updatedAt`.
-- Messages contain `id`, `conversationId`, `role`, `content`, and `createdAt`.
-- Conversation deletion cascades to its messages. Conversation ownership and message ordering have
-  the only additional indexes.
-- Message roles are restricted to `user` and `assistant` in both Zod and PostgreSQL.
-- Added authenticated APIs for conversation CRUD and conversation message listing/creation.
-- Every query derives the user ID from `auth.api.getSession` and scopes conversation access to it.
-- Missing and foreign conversations both return the controlled 404 response.
-- Replaced the mock conversation and message storage services with credentialed HTTP requests.
-- Sending a message persists the user message, streams the same simulated response locally, then
-  persists the completed assistant response.
-- Existing create, open, rename, delete, send, refresh, and logout/cache-clear flows are preserved.
+- Installed the official `@google/genai` package.
+- Added one `.server.ts` Gemini provider with a short general-purpose Aster instruction.
+- Added authenticated `POST /api/conversations/:id/generate` with shared Zod validation.
+- The endpoint derives the user ID from the verified Better Auth session and returns the same 404 for missing and foreign conversations.
+- Only the most recent 20 persisted messages are supplied as context, followed by the new message.
+- Successful generations persist the user message and assistant response in one transaction and update the conversation title and `updatedAt` timestamp.
+- Provider/configuration failures return a generic controlled 502 response without provider details.
+- `ChatService.sendMessage` makes one credentialed generation request and does not insert the user message separately.
+- The existing loading/optimistic UI is retained. The stop action aborts the browser request only.
+- Gemini configuration and SDK imports remain server-only; no `VITE_` Gemini variables were added.
+- No database schema or migration was changed.
 
-## Migration
+## Required environment variables
 
-Checked-in migration: `drizzle/0001_wandering_zuras.sql` plus its generated snapshot and journal
-entry.
+Set these in the local `.env` before starting the app:
 
-It creates:
+```dotenv
+GEMINI_API_KEY=<your-api-key>
+GEMINI_MODEL=<model-id-enabled-for-that-key>
+```
 
-- `conversations`, with a cascading foreign key to the existing `user` table and the composite
-  `conversations_user_updated_idx` index.
-- `messages`, with a cascading foreign key to `conversations`, a user/assistant role check, and the
-  composite `messages_conversation_created_idx` index.
-
-No existing authentication table was altered.
+The checked-in `.env.example` intentionally leaves both values blank. A missing value does not prevent the rest of Aster from starting, but generation returns the controlled unavailable error.
 
 ## Main files changed
 
-- `src/server/db/chat-schema.ts`
-- `src/server/db/schema.ts`
+- `.env.example`
+- `package.json`
+- `package-lock.json`
+- `src/server/config/env.server.ts`
+- `src/server/gemini/gemini.server.ts`
 - `src/server/chat/chat.server.ts`
-- `src/routes/api.conversations.ts`
-- `src/routes/api.conversations.$conversationId.ts`
-- `src/routes/api.conversations.$conversationId.messages.ts`
+- `src/routes/api.conversations.$conversationId.generate.ts`
 - `src/contracts/messages.ts`
-- `src/server/http/responses.server.ts`
-- `src/services/conversations/conversation.service.ts`
 - `src/services/chat/chat.service.ts`
-- `src/services/conversations/mock-conversation.service.ts` (removed)
-- `src/services/chat/mock-chat.service.ts` (removed)
-- `src/server/chat/chat.server.test.ts`
-- `src/services/persistence.service.test.ts`
 - `src/routeTree.gen.ts`
-- `drizzle/0001_wandering_zuras.sql`
-- `drizzle/meta/0001_snapshot.json`
-- `drizzle/meta/_journal.json`
-
-## API routes
-
-- `GET /api/conversations`
-- `POST /api/conversations`
-- `GET /api/conversations/:id`
-- `PATCH /api/conversations/:id`
-- `DELETE /api/conversations/:id`
-- `GET /api/conversations/:id/messages`
-- `POST /api/conversations/:id/messages`
+- Focused server, environment, frontend mapping, and server-boundary tests
 
 ## Verification
 
 Checkpoint verification on 2026-07-17:
 
-- `npm run db:generate` — passed; generated one migration
-- `npm run db:migrate` — passed against the configured local PostgreSQL database
-- `npm run typecheck` — passed
-- `npm run lint` — passed
-- `npm test` — passed: 11 files, 35 tests
-- `npm run build` — passed with the Node/Nitro production target
+- `npm run typecheck` - passed
+- `npm run lint` - passed
+- `npm test` - passed
+- `npm run build` - passed with the Node/Nitro production target
+- Built browser assets contain no `@google/genai`, `GEMINI_API_KEY`, or `GEMINI_MODEL` references
 
-Focused tests cover conversation creation/listing/rename/deletion, message persistence, cascade
-behavior, unauthenticated requests, cross-user isolation, and frontend HTTP request mapping.
+Focused tests cover unauthenticated rejection, ownership enforcement, successful mocked generation, controlled provider failure, message-pair persistence, latest-20 context, frontend request mapping, and the server-only Gemini boundary.
 
 ## Manual testing
 
-1. Start PostgreSQL, Redis, and Mailpit, then run `npm run db:migrate` and `npm run dev`.
-2. Sign in, create a new chat, send a message, and wait for the simulated assistant response.
-3. Refresh the page and confirm both messages and the conversation remain.
-4. Rename the conversation, refresh, and confirm the title remains.
-5. Delete the conversation and confirm it and its messages do not return after refresh.
-6. Sign out and confirm conversation/message query caches are cleared.
-7. With two verified accounts, confirm one account cannot open the other account's conversation URL.
+1. Add `GEMINI_API_KEY` and `GEMINI_MODEL` to the local `.env`, then restart `npm run dev`.
+2. Sign in, create or open a conversation, send a message, and confirm Gemini's response appears.
+3. Refresh the page and confirm both the user and assistant messages remain.
+4. Send more than 20 messages and confirm generation continues normally with bounded context.
+5. Start a request and press stop; confirm the browser stops waiting without a UI redesign.
+6. Temporarily use an invalid local key, restart, and confirm the browser shows only the generic generation error. Restore the valid key afterward.
+7. With two accounts, confirm one account receives 404 when attempting to generate against the other account's conversation ID.
 
 ## Known limitations
 
-- The assistant response is still simulated in the browser; there is no Gemini call yet.
-- Regeneration appends a newly simulated assistant response because message deletion/replacement was
-  intentionally not added.
-- There is no pagination, search, sharing, soft deletion, streaming infrastructure, or token
-  accounting.
-- Mailpit remains development-only.
-
-## Next task
-
-The next task should be minimal Gemini integration: replace only the simulated assistant generation
-with one authenticated, server-side Gemini call while preserving the current persistence model and
-keeping the Gemini API key server-only. Do not add SSE, WebSockets, generation-run tables, token
-accounting, or other production-scale infrastructure in that phase.
+- Generation is non-streaming, so the response appears after Gemini completes.
+- Browser abort does not cancel work already running at Gemini or on the server; a completed request may still be persisted after the browser stops waiting.
+- Context is limited to the latest 20 messages with no summarization.
+- Regeneration is intentionally unavailable because safe replace/regenerate semantics were outside this phase; this prevents duplicate user-message insertion.
+- There is no token/cost accounting, quotas, moderation layer, tools, search, RAG, uploads, model selector, or server-side generation cancellation.
