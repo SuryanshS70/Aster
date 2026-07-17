@@ -8,7 +8,8 @@ export function useSession() {
   const query = useQuery({
     queryKey: queryKeys.session,
     queryFn: () => authService.getCurrentUser(),
-    staleTime: 60_000,
+    staleTime: 30_000,
+    retry: false,
   });
 
   useEffect(() => {
@@ -41,8 +42,8 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => authService.logout(),
     onSuccess: () => {
-      qc.setQueryData(queryKeys.session, null);
       qc.clear();
+      qc.setQueryData(queryKeys.session, null);
     },
   });
 }

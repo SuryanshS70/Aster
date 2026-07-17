@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet, createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useSession } from "@/hooks/useAuth";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { getAllowedAuthRedirect } from "@/services/auth/redirects";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -15,7 +16,11 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (isLoading) return;
     if (!data) {
-      navigate({ to: "/login", search: { redirect: pathname }, replace: true });
+      navigate({
+        to: "/login",
+        search: { redirect: getAllowedAuthRedirect(pathname) },
+        replace: true,
+      });
     }
   }, [data, isLoading, navigate, pathname]);
 

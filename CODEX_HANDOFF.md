@@ -2,98 +2,119 @@
 
 ## Current checkpoint
 
-Phase 3A (backend authentication) is complete. Aster remains one TanStack Start modular monolith. The existing Lovable frontend and all mock frontend services are unchanged; real frontend authentication is explicitly deferred to Phase 3B.
+Phase 3B (frontend authentication integration) is complete. Aster remains one TanStack Start
+modular monolith. The existing Lovable layout, styling, and component structure are preserved.
 
-## Implemented in Phase 3A
+The browser now uses the Phase 3A Better Auth backend for authentication and server-backed
+sessions. Conversation and chat services intentionally remain mock-backed.
 
-- Better Auth `1.6.23` is mounted through the TanStack Start catch-all route at `/api/auth/*`.
-- Better Auth uses the Drizzle PostgreSQL adapter. Users, credentials, verification records, and sessions are database-backed.
-- Email/password signup and login, required email verification, logout, current-session lookup, forgot-password, and password reset are configured.
-- Password reset tokens expire after one hour, are single-use, and a successful reset revokes existing sessions.
-- Auth cookies use the `aster` prefix, `HttpOnly`, `SameSite=Lax`, and `Path=/`; `Secure` is enabled when `NODE_ENV=production`.
-- Mutation requests have TanStack same-origin CSRF middleware plus auth-specific exact-origin validation against `BETTER_AUTH_URL` and `TRUSTED_ORIGINS`.
-- Existing Zod auth contracts validate and normalize request bodies. Email addresses are trimmed and lowercased before Better Auth receives them.
-- Login failures and forgot-password requests return generic responses. Redirect targets accepted by the auth wrapper must be internal paths.
-- Better Auth rate limits auth endpoints using Redis. The Redis adapter uses an atomic Lua `consume` operation to prevent concurrent-request bypasses.
-- Nodemailer sends verification and reset messages to Mailpit in development. Sensitive tokens, cookies, authorization headers, and passwords are not logged.
-- Zod was aligned to version 4 because Better Auth uses Zod 4 APIs.
+## Implemented in Phase 3B
 
-## Database migration
+- Replaced `mockAuthService` with same-origin, credentialed HTTP calls to `/api/auth/*` for login,
+  signup, logout, current-session lookup, forgot-password, and password reset.
+- Removed the localStorage authentication session, generated mock users, fake authentication
+  success, and the fallback reset token.
+- Kept the existing `AuthService` interface, with the minimal signup return-type change needed for
+  required email verification: signup returns `null` while verification is pending instead of
+  inventing a session.
+- Restores the authenticated user after refresh from Better Auth's `get-session` endpoint. User IDs
+  shown to the frontend come only from that verified server session.
+- Protected layouts wait for session verification and redirect unauthenticated users to `/login`.
+- Authenticated users are redirected away from `/login` and `/signup` to `/chat`.
+- Login redirects accept only the exact internal allowlist `/chat` and `/settings`; invalid,
+  external, protocol-relative, and unlisted destinations fall back to `/chat`.
+- Logout calls Better Auth, clears all TanStack Query state, and then caches an explicit null
+  session so protected content is not retained.
+- Existing Zod contracts validate login, signup, forgot-password, and reset-password submissions.
+  Forms display field-level validation messages and controlled authentication errors.
+- Login, signup, reset-password, and password-confirmation fields have accessible visibility
+  toggles. Form controls are disabled while their requests are pending.
+- Signup shows a generic email-verification state when Better Auth does not create a session.
+- Forgot-password always shows the same generic success response and does not disclose whether the
+  address exists.
+- Reset-password requires a non-empty token from the reset URL. Missing, invalid, expired, and
+  reused tokens do not receive a client fallback.
+- Added focused Vitest coverage for login, signup, logout, session restoration, protected-route
+  redirect validation, forgot-password submission, and reset-token enforcement.
 
-Checked-in migration: `drizzle/0000_familiar_the_anarchist.sql`, with Drizzle journal and snapshot metadata.
+## Files changed in Phase 3B
 
-It creates Better Auth's recommended tables:
+- `src/services/auth/auth.service.ts`
+- `src/services/auth/auth.types.ts`
+- `src/services/auth/redirects.ts`
+- `src/services/auth/auth.service.test.ts`
+- `src/services/auth/redirects.test.ts`
+- `src/services/auth/mock-auth.service.ts` (removed)
+- `src/services/services.smoke.test.ts`
+- `src/hooks/useAuth.ts`
+- `src/components/auth/LoginForm.tsx`
+- `src/components/auth/SignupForm.tsx`
+- `src/components/auth/ForgotPasswordForm.tsx`
+- `src/components/auth/ResetPasswordForm.tsx`
+- `src/routes/_authenticated.tsx`
+- `src/routes/login.tsx`
+- `src/routes/signup.tsx`
+- `CODEX_HANDOFF.md`
 
-- `user`
-- `session`
-- `account`
-- `verification`
+No database, migration, PostgreSQL, Redis, Mailpit, Docker, health-route, logging, or CSRF files were
+changed in Phase 3B. Conversation and chat services were not replaced.
 
-Foreign keys cascade from `session.user_id` and `account.user_id` to `user.id`. Session tokens and stored email values are unique. A defensive `user_email_lower_unique` functional index enforces case-insensitive email uniqueness.
-
-No conversation or message tables were added.
-
-## Server environment variables
-
-All values are documented with placeholders in `.env.example`.
-
-Required authentication/runtime values:
-
-- `DATABASE_URL`
-- `REDIS_URL`
-- `REDIS_KEY_PREFIX`
-- `SESSION_SECRET` (at least 32 characters; use a random production secret)
-- `BETTER_AUTH_URL` (the externally reachable application origin)
-- `TRUSTED_ORIGINS` (comma-separated additional exact origins)
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_SECURE`
-- `SMTP_FROM`
-
-Existing runtime values remain: `NODE_ENV`, `HOST`, `PORT`, `LOG_LEVEL`, `REQUEST_BODY_LIMIT_BYTES`, and `SHUTDOWN_TIMEOUT_MS`. `GEMINI_API_KEY` and `GEMINI_MODEL` remain unused placeholders for a later phase and must never enter frontend code.
-
-## Local setup and testing
-
-1. Copy `.env.example` to `.env` and replace the local PostgreSQL password and `SESSION_SECRET` placeholders.
-2. Start dependencies: `docker compose up -d postgres redis mailpit`.
-3. Apply the checked-in migration: `npm run db:migrate`.
-4. Start Aster: `npm run dev`.
-5. Open Aster at the origin configured by `BETTER_AUTH_URL` (the Vite dev default in this repository is `http://localhost:8080`).
-6. Open Mailpit at `http://localhost:8025` to follow verification and password-reset links.
-
-To run the whole application in containers, set non-placeholder `POSTGRES_PASSWORD` and `SESSION_SECRET`, run `docker compose up --build`, and apply `npm run db:migrate` against that database before testing signup. Database migrations are not automatically run by the app container.
+## Verification
 
 Checkpoint verification on 2026-07-17:
 
 - `npm run typecheck` — passed
 - `npm run lint` — passed
-- `npm test` — passed: 8 files, 23 tests
+- `npm test` — passed: 10 files, 30 tests
 - `npm run build` — passed with the Node/Nitro production target
-- `docker compose config --quiet` — passed; this sandbox only warned that the user's Docker CLI config file was unreadable
+- Client bundle scan for server credential names and PostgreSQL/Redis connection-string patterns —
+  no matches
 
-Tests cover environment validation, existing health/error infrastructure, auth request validation and origin rejection, generic login and forgot-password behavior, email normalization and duplicate signup, email verification, session restoration, logout revocation, invalid/reused reset tokens, reset-triggered session revocation, rate limiting, and Redis rate-limit serialization.
+The production build still emits the pre-existing advisory that Vite supports TypeScript path
+resolution natively while the project uses `vite-tsconfig-paths`.
 
-## Explicitly deferred
+## Manual authentication testing
 
-The exact minimal Phase 3B objective is to replace only the mock browser `AuthService` and connect the existing Lovable auth forms, session state, redirects, logout, and protected-route checks to the completed Better Auth backend:
+1. Copy `.env.example` to `.env`, replace the local PostgreSQL password and `SESSION_SECRET`
+   placeholders, and keep `BETTER_AUTH_URL` aligned with the browser origin (normally
+   `http://localhost:8080`).
+2. Start dependencies with `docker compose up -d postgres redis mailpit`.
+3. Apply the checked-in Phase 3A migration with `npm run db:migrate`.
+4. Start Aster with `npm run dev`, then open the exact origin configured by `BETTER_AUTH_URL`.
+5. Sign up with a new address. Confirm the form shows the generic verification message and does not
+   enter the protected app before verification.
+6. Open Mailpit at `http://localhost:8025`, follow the verification link, and confirm the verified
+   session reaches `/chat`.
+7. Refresh `/chat` and confirm the session is restored. Open `/login` and `/signup` while signed in
+   and confirm both redirect to `/chat`.
+8. Sign out from the sidebar or settings. Confirm the app reaches `/login`, protected data is
+   cleared, and opening `/chat` or `/settings` redirects to login.
+9. Sign in with an incorrect password and confirm only the controlled generic error appears. Then
+   sign in with the verified credentials and confirm `/chat` loads.
+10. Submit forgot-password for both an existing and a non-existing address. Confirm the same generic
+    success text appears in both cases and that only the existing account receives mail in Mailpit.
+11. Follow the Mailpit reset link, set a valid new password, and confirm the old password and old
+    sessions no longer work. Confirm a missing, altered, or reused token shows an invalid/expired
+    error and never submits a fake token.
+12. Try `/login?redirect=https://evil.test`, `/login?redirect=//evil.test`, and an unlisted internal
+    path. After login, confirm each falls back to `/chat`; `/chat` and `/settings` remain accepted.
 
-- Replace only the mock `AuthService` with an HTTP/Better Auth implementation.
-- Connect login, signup, logout, forgot-password, and reset-password forms.
-- Add password visibility toggles without changing the existing design.
-- Restore sessions after refresh and protect authenticated routes with server session checks.
-- Redirect authenticated users away from auth pages, validate redirect destinations, show controlled errors, and clear auth-related TanStack Query state on logout.
-- Add frontend/session/protected-route tests and a client-bundle secret scan.
+## Known limitations
 
-Also deferred: conversation/message tables and APIs, Gemini, chat streaming, general rate limiting, and replacing conversation/chat mock services.
+- The focused frontend tests mock `fetch`; there is no automated browser E2E suite that starts live
+  PostgreSQL, Redis, and Mailpit. The existing Phase 3A backend integration tests remain in place.
+- Protected-route verification is performed by a browser request to the server session endpoint.
+  The protected layout renders only a loading state until that request completes.
+- The intentionally small redirect allowlist does not preserve conversation-specific URLs.
+- Mailpit is development-only; no production email provider or delivery/retry strategy is present.
+- Database migrations remain a manual setup step.
+- Conversation and message data, assistant responses, and streaming remain mock-backed.
+- `npm install` previously reported four moderate transitive dependency audit findings; no forced or
+  breaking audit upgrade was introduced in this phase.
 
-Phase 3B must not introduce a separate backend, new infrastructure, optional authentication providers, production email delivery, unrelated refactors, or design changes. Implement only what is necessary to complete frontend authentication integration and its tests.
+## Next recommended phase
 
-## Known limitations and next-thread notes
-
-- The browser still uses `mockAuthService`; the new backend endpoints are not yet called by the UI. Current frontend route protection therefore still trusts mock client state.
-- Backend tests use Better Auth's isolated memory adapter; no automated live integration test currently starts PostgreSQL, Redis, or Mailpit. Production configuration uses Drizzle/PostgreSQL and Redis.
-- Mailpit is development-only. A production email provider and delivery/retry strategy are not configured.
-- The migration must be applied manually before auth endpoints can use PostgreSQL.
-- `npm install` reports four moderate transitive dependency audit findings; no forced or breaking audit upgrade was applied.
-- The production build emits only the pre-existing advisory that Vite now supports TypeScript path resolution natively while this project still uses `vite-tsconfig-paths`.
-- Do not redesign or replace the Lovable component tree. Start the next task at Phase 3B frontend auth integration and keep all authenticated user IDs sourced only from verified server sessions.
+The next phase should implement basic conversation and message persistence: add the minimal Drizzle
+tables and authenticated server APIs for conversations and messages, always deriving ownership from
+the verified server session. Keep Gemini integration and chat streaming deferred until persistence
+is working and tested.

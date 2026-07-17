@@ -44,6 +44,8 @@ services:
 
   postgres:
     image: postgres:17-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-aster}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace-me}
@@ -60,6 +62,8 @@ services:
 
   redis:
     image: redis:7.4-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data

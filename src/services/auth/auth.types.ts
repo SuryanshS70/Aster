@@ -33,7 +33,7 @@ export type AuthChangeListener = (session: Session | null) => void;
 export interface AuthService {
   getCurrentUser(): Promise<Session | null>;
   login(input: LoginInput): Promise<Session>;
-  signup(input: SignupInput): Promise<Session>;
+  signup(input: SignupInput): Promise<Session | null>;
   logout(): Promise<void>;
   requestPasswordReset(email: string): Promise<void>;
   resetPassword(input: ResetPasswordInput): Promise<void>;
