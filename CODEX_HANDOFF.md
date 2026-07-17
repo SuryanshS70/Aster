@@ -2,119 +2,110 @@
 
 ## Current checkpoint
 
-Phase 3B (frontend authentication integration) is complete. Aster remains one TanStack Start
-modular monolith. The existing Lovable layout, styling, and component structure are preserved.
+Minimal conversation and message persistence is complete. Aster remains a TanStack Start modular
+monolith and preserves the existing Lovable chat interface.
 
-The browser now uses the Phase 3A Better Auth backend for authentication and server-backed
-sessions. Conversation and chat services intentionally remain mock-backed.
+Authentication continues to use the Phase 3A/3B Better Auth architecture. Conversations and
+messages now persist in PostgreSQL and are always scoped to the verified session user. The existing
+simulated assistant response remains temporary and is persisted after it finishes.
 
-## Implemented in Phase 3B
+## Implemented
 
-- Replaced `mockAuthService` with same-origin, credentialed HTTP calls to `/api/auth/*` for login,
-  signup, logout, current-session lookup, forgot-password, and password reset.
-- Removed the localStorage authentication session, generated mock users, fake authentication
-  success, and the fallback reset token.
-- Kept the existing `AuthService` interface, with the minimal signup return-type change needed for
-  required email verification: signup returns `null` while verification is pending instead of
-  inventing a session.
-- Restores the authenticated user after refresh from Better Auth's `get-session` endpoint. User IDs
-  shown to the frontend come only from that verified server session.
-- Protected layouts wait for session verification and redirect unauthenticated users to `/login`.
-- Authenticated users are redirected away from `/login` and `/signup` to `/chat`.
-- Login redirects accept only the exact internal allowlist `/chat` and `/settings`; invalid,
-  external, protocol-relative, and unlisted destinations fall back to `/chat`.
-- Logout calls Better Auth, clears all TanStack Query state, and then caches an explicit null
-  session so protected content is not retained.
-- Existing Zod contracts validate login, signup, forgot-password, and reset-password submissions.
-  Forms display field-level validation messages and controlled authentication errors.
-- Login, signup, reset-password, and password-confirmation fields have accessible visibility
-  toggles. Form controls are disabled while their requests are pending.
-- Signup shows a generic email-verification state when Better Auth does not create a session.
-- Forgot-password always shows the same generic success response and does not disclose whether the
-  address exists.
-- Reset-password requires a non-empty token from the reset URL. Missing, invalid, expired, and
-  reused tokens do not receive a client fallback.
-- Added focused Vitest coverage for login, signup, logout, session restoration, protected-route
-  redirect validation, forgot-password submission, and reset-token enforcement.
+- Added only `conversations` and `messages` tables.
+- Conversations contain `id`, `userId`, `title`, `createdAt`, and `updatedAt`.
+- Messages contain `id`, `conversationId`, `role`, `content`, and `createdAt`.
+- Conversation deletion cascades to its messages. Conversation ownership and message ordering have
+  the only additional indexes.
+- Message roles are restricted to `user` and `assistant` in both Zod and PostgreSQL.
+- Added authenticated APIs for conversation CRUD and conversation message listing/creation.
+- Every query derives the user ID from `auth.api.getSession` and scopes conversation access to it.
+- Missing and foreign conversations both return the controlled 404 response.
+- Replaced the mock conversation and message storage services with credentialed HTTP requests.
+- Sending a message persists the user message, streams the same simulated response locally, then
+  persists the completed assistant response.
+- Existing create, open, rename, delete, send, refresh, and logout/cache-clear flows are preserved.
 
-## Files changed in Phase 3B
+## Migration
 
-- `src/services/auth/auth.service.ts`
-- `src/services/auth/auth.types.ts`
-- `src/services/auth/redirects.ts`
-- `src/services/auth/auth.service.test.ts`
-- `src/services/auth/redirects.test.ts`
-- `src/services/auth/mock-auth.service.ts` (removed)
-- `src/services/services.smoke.test.ts`
-- `src/hooks/useAuth.ts`
-- `src/components/auth/LoginForm.tsx`
-- `src/components/auth/SignupForm.tsx`
-- `src/components/auth/ForgotPasswordForm.tsx`
-- `src/components/auth/ResetPasswordForm.tsx`
-- `src/routes/_authenticated.tsx`
-- `src/routes/login.tsx`
-- `src/routes/signup.tsx`
-- `CODEX_HANDOFF.md`
+Checked-in migration: `drizzle/0001_wandering_zuras.sql` plus its generated snapshot and journal
+entry.
 
-No database, migration, PostgreSQL, Redis, Mailpit, Docker, health-route, logging, or CSRF files were
-changed in Phase 3B. Conversation and chat services were not replaced.
+It creates:
+
+- `conversations`, with a cascading foreign key to the existing `user` table and the composite
+  `conversations_user_updated_idx` index.
+- `messages`, with a cascading foreign key to `conversations`, a user/assistant role check, and the
+  composite `messages_conversation_created_idx` index.
+
+No existing authentication table was altered.
+
+## Main files changed
+
+- `src/server/db/chat-schema.ts`
+- `src/server/db/schema.ts`
+- `src/server/chat/chat.server.ts`
+- `src/routes/api.conversations.ts`
+- `src/routes/api.conversations.$conversationId.ts`
+- `src/routes/api.conversations.$conversationId.messages.ts`
+- `src/contracts/messages.ts`
+- `src/server/http/responses.server.ts`
+- `src/services/conversations/conversation.service.ts`
+- `src/services/chat/chat.service.ts`
+- `src/services/conversations/mock-conversation.service.ts` (removed)
+- `src/services/chat/mock-chat.service.ts` (removed)
+- `src/server/chat/chat.server.test.ts`
+- `src/services/persistence.service.test.ts`
+- `src/routeTree.gen.ts`
+- `drizzle/0001_wandering_zuras.sql`
+- `drizzle/meta/0001_snapshot.json`
+- `drizzle/meta/_journal.json`
+
+## API routes
+
+- `GET /api/conversations`
+- `POST /api/conversations`
+- `GET /api/conversations/:id`
+- `PATCH /api/conversations/:id`
+- `DELETE /api/conversations/:id`
+- `GET /api/conversations/:id/messages`
+- `POST /api/conversations/:id/messages`
 
 ## Verification
 
 Checkpoint verification on 2026-07-17:
 
+- `npm run db:generate` — passed; generated one migration
+- `npm run db:migrate` — passed against the configured local PostgreSQL database
 - `npm run typecheck` — passed
 - `npm run lint` — passed
-- `npm test` — passed: 10 files, 30 tests
+- `npm test` — passed: 11 files, 35 tests
 - `npm run build` — passed with the Node/Nitro production target
-- Client bundle scan for server credential names and PostgreSQL/Redis connection-string patterns —
-  no matches
 
-The production build still emits the pre-existing advisory that Vite supports TypeScript path
-resolution natively while the project uses `vite-tsconfig-paths`.
+Focused tests cover conversation creation/listing/rename/deletion, message persistence, cascade
+behavior, unauthenticated requests, cross-user isolation, and frontend HTTP request mapping.
 
-## Manual authentication testing
+## Manual testing
 
-1. Copy `.env.example` to `.env`, replace the local PostgreSQL password and `SESSION_SECRET`
-   placeholders, and keep `BETTER_AUTH_URL` aligned with the browser origin (normally
-   `http://localhost:8080`).
-2. Start dependencies with `docker compose up -d postgres redis mailpit`.
-3. Apply the checked-in Phase 3A migration with `npm run db:migrate`.
-4. Start Aster with `npm run dev`, then open the exact origin configured by `BETTER_AUTH_URL`.
-5. Sign up with a new address. Confirm the form shows the generic verification message and does not
-   enter the protected app before verification.
-6. Open Mailpit at `http://localhost:8025`, follow the verification link, and confirm the verified
-   session reaches `/chat`.
-7. Refresh `/chat` and confirm the session is restored. Open `/login` and `/signup` while signed in
-   and confirm both redirect to `/chat`.
-8. Sign out from the sidebar or settings. Confirm the app reaches `/login`, protected data is
-   cleared, and opening `/chat` or `/settings` redirects to login.
-9. Sign in with an incorrect password and confirm only the controlled generic error appears. Then
-   sign in with the verified credentials and confirm `/chat` loads.
-10. Submit forgot-password for both an existing and a non-existing address. Confirm the same generic
-    success text appears in both cases and that only the existing account receives mail in Mailpit.
-11. Follow the Mailpit reset link, set a valid new password, and confirm the old password and old
-    sessions no longer work. Confirm a missing, altered, or reused token shows an invalid/expired
-    error and never submits a fake token.
-12. Try `/login?redirect=https://evil.test`, `/login?redirect=//evil.test`, and an unlisted internal
-    path. After login, confirm each falls back to `/chat`; `/chat` and `/settings` remain accepted.
+1. Start PostgreSQL, Redis, and Mailpit, then run `npm run db:migrate` and `npm run dev`.
+2. Sign in, create a new chat, send a message, and wait for the simulated assistant response.
+3. Refresh the page and confirm both messages and the conversation remain.
+4. Rename the conversation, refresh, and confirm the title remains.
+5. Delete the conversation and confirm it and its messages do not return after refresh.
+6. Sign out and confirm conversation/message query caches are cleared.
+7. With two verified accounts, confirm one account cannot open the other account's conversation URL.
 
 ## Known limitations
 
-- The focused frontend tests mock `fetch`; there is no automated browser E2E suite that starts live
-  PostgreSQL, Redis, and Mailpit. The existing Phase 3A backend integration tests remain in place.
-- Protected-route verification is performed by a browser request to the server session endpoint.
-  The protected layout renders only a loading state until that request completes.
-- The intentionally small redirect allowlist does not preserve conversation-specific URLs.
-- Mailpit is development-only; no production email provider or delivery/retry strategy is present.
-- Database migrations remain a manual setup step.
-- Conversation and message data, assistant responses, and streaming remain mock-backed.
-- `npm install` previously reported four moderate transitive dependency audit findings; no forced or
-  breaking audit upgrade was introduced in this phase.
+- The assistant response is still simulated in the browser; there is no Gemini call yet.
+- Regeneration appends a newly simulated assistant response because message deletion/replacement was
+  intentionally not added.
+- There is no pagination, search, sharing, soft deletion, streaming infrastructure, or token
+  accounting.
+- Mailpit remains development-only.
 
-## Next recommended phase
+## Next task
 
-The next phase should implement basic conversation and message persistence: add the minimal Drizzle
-tables and authenticated server APIs for conversations and messages, always deriving ownership from
-the verified server session. Keep Gemini integration and chat streaming deferred until persistence
-is working and tested.
+The next task should be minimal Gemini integration: replace only the simulated assistant generation
+with one authenticated, server-side Gemini call while preserving the current persistence model and
+keeping the Gemini API key server-only. Do not add SSE, WebSockets, generation-run tables, token
+accounting, or other production-scale infrastructure in that phase.

@@ -15,13 +15,16 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiConversationsRouteImport } from './routes/api.conversations'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
 import { Route as AuthenticatedChatIndexRouteImport } from './routes/_authenticated.chat.index'
 import { Route as ApiHealthReadyRouteImport } from './routes/api.health.ready'
 import { Route as ApiHealthLiveRouteImport } from './routes/api.health.live'
+import { Route as ApiConversationsConversationIdRouteImport } from './routes/api.conversations.$conversationId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedChatConversationIdRouteImport } from './routes/_authenticated.chat.$conversationId'
+import { Route as ApiConversationsConversationIdMessagesRouteImport } from './routes/api.conversations.$conversationId.messages'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -52,6 +55,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiConversationsRoute = ApiConversationsRouteImport.update({
+  id: '/api/conversations',
+  path: '/api/conversations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -77,6 +85,12 @@ const ApiHealthLiveRoute = ApiHealthLiveRouteImport.update({
   path: '/api/health/live',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiConversationsConversationIdRoute =
+  ApiConversationsConversationIdRouteImport.update({
+    id: '/$conversationId',
+    path: '/$conversationId',
+    getParentRoute: () => ApiConversationsRoute,
+  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -88,6 +102,12 @@ const AuthenticatedChatConversationIdRoute =
     path: '/$conversationId',
     getParentRoute: () => AuthenticatedChatRoute,
   } as any)
+const ApiConversationsConversationIdMessagesRoute =
+  ApiConversationsConversationIdMessagesRouteImport.update({
+    id: '/messages',
+    path: '/messages',
+    getParentRoute: () => ApiConversationsConversationIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -97,11 +117,14 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/chat': typeof AuthenticatedChatRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/conversations': typeof ApiConversationsRouteWithChildren
   '/chat/$conversationId': typeof AuthenticatedChatConversationIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
   '/chat/': typeof AuthenticatedChatIndexRoute
+  '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,11 +133,14 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/conversations': typeof ApiConversationsRouteWithChildren
   '/chat/$conversationId': typeof AuthenticatedChatConversationIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
   '/chat': typeof AuthenticatedChatIndexRoute
+  '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -126,11 +152,14 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/chat': typeof AuthenticatedChatRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/conversations': typeof ApiConversationsRouteWithChildren
   '/_authenticated/chat/$conversationId': typeof AuthenticatedChatConversationIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
   '/_authenticated/chat/': typeof AuthenticatedChatIndexRoute
+  '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -142,11 +171,14 @@ export interface FileRouteTypes {
     | '/signup'
     | '/chat'
     | '/settings'
+    | '/api/conversations'
     | '/chat/$conversationId'
     | '/api/auth/$'
+    | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
     | '/chat/'
+    | '/api/conversations/$conversationId/messages'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,11 +187,14 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/settings'
+    | '/api/conversations'
     | '/chat/$conversationId'
     | '/api/auth/$'
+    | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
     | '/chat'
+    | '/api/conversations/$conversationId/messages'
   id:
     | '__root__'
     | '/'
@@ -170,11 +205,14 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/chat'
     | '/_authenticated/settings'
+    | '/api/conversations'
     | '/_authenticated/chat/$conversationId'
     | '/api/auth/$'
+    | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
     | '/_authenticated/chat/'
+    | '/api/conversations/$conversationId/messages'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -184,6 +222,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  ApiConversationsRoute: typeof ApiConversationsRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiHealthLiveRoute: typeof ApiHealthLiveRoute
   ApiHealthReadyRoute: typeof ApiHealthReadyRoute
@@ -233,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/conversations': {
+      id: '/api/conversations'
+      path: '/api/conversations'
+      fullPath: '/api/conversations'
+      preLoaderRoute: typeof ApiConversationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -268,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthLiveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/conversations/$conversationId': {
+      id: '/api/conversations/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/api/conversations/$conversationId'
+      preLoaderRoute: typeof ApiConversationsConversationIdRouteImport
+      parentRoute: typeof ApiConversationsRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -281,6 +334,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/chat/$conversationId'
       preLoaderRoute: typeof AuthenticatedChatConversationIdRouteImport
       parentRoute: typeof AuthenticatedChatRoute
+    }
+    '/api/conversations/$conversationId/messages': {
+      id: '/api/conversations/$conversationId/messages'
+      path: '/messages'
+      fullPath: '/api/conversations/$conversationId/messages'
+      preLoaderRoute: typeof ApiConversationsConversationIdMessagesRouteImport
+      parentRoute: typeof ApiConversationsConversationIdRoute
     }
   }
 }
@@ -312,6 +372,33 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface ApiConversationsConversationIdRouteChildren {
+  ApiConversationsConversationIdMessagesRoute: typeof ApiConversationsConversationIdMessagesRoute
+}
+
+const ApiConversationsConversationIdRouteChildren: ApiConversationsConversationIdRouteChildren =
+  {
+    ApiConversationsConversationIdMessagesRoute:
+      ApiConversationsConversationIdMessagesRoute,
+  }
+
+const ApiConversationsConversationIdRouteWithChildren =
+  ApiConversationsConversationIdRoute._addFileChildren(
+    ApiConversationsConversationIdRouteChildren,
+  )
+
+interface ApiConversationsRouteChildren {
+  ApiConversationsConversationIdRoute: typeof ApiConversationsConversationIdRouteWithChildren
+}
+
+const ApiConversationsRouteChildren: ApiConversationsRouteChildren = {
+  ApiConversationsConversationIdRoute:
+    ApiConversationsConversationIdRouteWithChildren,
+}
+
+const ApiConversationsRouteWithChildren =
+  ApiConversationsRoute._addFileChildren(ApiConversationsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
@@ -319,6 +406,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  ApiConversationsRoute: ApiConversationsRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiHealthLiveRoute: ApiHealthLiveRoute,
   ApiHealthReadyRoute: ApiHealthReadyRoute,

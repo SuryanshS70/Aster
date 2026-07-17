@@ -13,12 +13,19 @@ export const messageContentSchema = z
   .max(32_000, "Message must be 32,000 characters or fewer")
   .refine((content) => content.trim().length > 0, "Message cannot be empty");
 
-export const roleSchema = z.enum(["user", "assistant", "system"]);
+export const roleSchema = z.enum(["user", "assistant"]);
 export const messageStatusSchema = z.enum(["pending", "streaming", "complete", "error"]);
 
 export const sendMessageInputSchema = z
   .object({
     conversationId: conversationIdSchema,
+    content: messageContentSchema,
+  })
+  .strict();
+
+export const createMessageInputSchema = z
+  .object({
+    role: roleSchema,
     content: messageContentSchema,
   })
   .strict();
@@ -45,4 +52,5 @@ export type Role = z.infer<typeof roleSchema>;
 export type MessageStatus = z.infer<typeof messageStatusSchema>;
 export type Message = z.infer<typeof messageSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
+export type CreateMessageInput = z.infer<typeof createMessageInputSchema>;
 export type StreamChunk = z.infer<typeof streamChunkSchema>;

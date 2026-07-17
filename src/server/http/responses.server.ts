@@ -3,6 +3,8 @@ export type ApiErrorCode =
   | "CONTENT_TOO_LARGE"
   | "INTERNAL_SERVER_ERROR"
   | "METHOD_NOT_ALLOWED"
+  | "NOT_FOUND"
+  | "UNAUTHORIZED"
   | "SERVICE_UNAVAILABLE";
 
 export class ApiError extends Error {
