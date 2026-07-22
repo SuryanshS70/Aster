@@ -28,3 +28,5 @@ export type {
 } from "./chat/chat.types";
 export { MessageRateLimitError } from "./chat/chat.types";
 export { chatService } from "./chat/chat.service";
+
+export { modelPreferenceService } from "./settings/model-preference.service";

@@ -37,11 +37,6 @@ const serverEnvSchema = z
       .trim()
       .optional()
       .transform((value) => value || undefined),
-    GEMINI_MODEL: z
-      .string()
-      .trim()
-      .optional()
-      .transform((value) => value || undefined),
   })
   .superRefine((env, context) => {
     validateUrlProtocol(env.DATABASE_URL, ["postgres:", "postgresql:"], "DATABASE_URL", context);
@@ -69,7 +64,7 @@ function validateUrlProtocol(
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
-export type GeminiConfig = { apiKey: string; model: string };
+export type GeminiConfig = { apiKey: string };
 
 let cachedEnv: ServerEnv | undefined;
 
@@ -100,14 +95,11 @@ export function getTrustedOrigins(env: ServerEnv): string[] {
 }
 
 export function getGeminiConfig(env: ServerEnv = getServerEnv()): GeminiConfig {
-  const result = z
-    .object({
-      apiKey: z.string().min(1),
-      model: z.string().min(1),
-    })
-    .safeParse({ apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL });
+  const result = z.object({ apiKey: z.string().min(1) }).safeParse({
+    apiKey: env.GEMINI_API_KEY,
+  });
   if (!result.success) {
-    throw new Error("Invalid server environment: GEMINI_API_KEY, GEMINI_MODEL");
+    throw new Error("Invalid server environment: GEMINI_API_KEY");
   }
   return result.data;
 }

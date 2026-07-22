@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { Conversation, CreateMessageInput, Message } from "../../contracts";
+import {
+  DEFAULT_GEMINI_MODEL,
+  type Conversation,
+  type CreateMessageInput,
+  type GeminiModel,
+  type Message,
+} from "../../contracts";
 import type { GeminiHistoryMessage } from "../gemini/gemini.server";
 import { createChatApi, type ChatStore } from "./chat.server";
 
@@ -63,7 +69,8 @@ class MemoryChatStore implements ChatStore {
   }
 
   async createMessage(userId: string, conversationId: string, input: CreateMessageInput) {
-    if (!(await this.getConversation(userId, conversationId))) return null;
+    const conversation = this.conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) return null;
     const message: Message = {
       id: `message_${++this.sequence}`,
       conversationId,
@@ -73,6 +80,9 @@ class MemoryChatStore implements ChatStore {
       status: "complete",
     };
     this.messages.set(conversationId, [...(this.messages.get(conversationId) ?? []), message]);
+    if (input.role === "user" && conversation.title === "New conversation") {
+      conversation.title = input.content.trim().slice(0, 60);
+    }
     return message;
   }
 
@@ -99,6 +109,22 @@ class MemoryChatStore implements ChatStore {
     if (!user || !assistant) return null;
     return { user, assistant };
   }
+
+  async replaceAssistantMessage(
+    userId: string,
+    conversationId: string,
+    assistantMessageId: string,
+    assistantContent: string,
+  ) {
+    if (!(await this.getConversation(userId, conversationId))) return null;
+    const existing = this.messages.get(conversationId) ?? [];
+    const assistant = existing.find(
+      (message) => message.id === assistantMessageId && message.role === "assistant",
+    );
+    if (!assistant) return null;
+    assistant.content = assistantContent;
+    return assistant;
+  }
 }
 
 function request(method: string, path: string, userId?: string, body?: unknown) {
@@ -113,17 +139,23 @@ function request(method: string, path: string, userId?: string, body?: unknown) 
 }
 
 function setup(
-  generate: (history: GeminiHistoryMessage[], message: string) => Promise<string> = async () =>
-    "Generated response",
+  generate: (
+    history: GeminiHistoryMessage[],
+    message: string,
+    model: GeminiModel,
+  ) => Promise<string> = async () => "Generated response",
+  model: GeminiModel = DEFAULT_GEMINI_MODEL,
 ) {
   const store = new MemoryChatStore();
+  const resolveModel = vi.fn(async () => model);
   const api = createChatApi({
     store,
     resolveUserId: async (incoming) => incoming.headers.get("x-test-user"),
+    resolveModel,
     generate,
     bodyLimitBytes: 16_384,
   });
-  return { api, store };
+  return { api, store, resolveModel };
 }
 
 describe("authenticated conversation API", () => {
@@ -258,7 +290,7 @@ describe("authenticated conversation API", () => {
     const generate = vi.fn(
       async (_history: GeminiHistoryMessage[], _message: string) => "Gemini answer",
     );
-    const { api, store } = setup(generate);
+    const { api, store, resolveModel } = setup(generate, "gemini-3.5-flash-lite");
     const created = (await (
       await api.conversations(request("POST", "/api/conversations", "user-a", {}), "create")
     ).json()) as Conversation;
@@ -284,9 +316,40 @@ describe("authenticated conversation API", () => {
     expect(generate).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ content: "History 20" })]),
       "New question",
+      "gemini-3.5-flash-lite",
     );
+    expect(resolveModel).toHaveBeenCalledWith("user-a");
     expect(generate.mock.calls[0]?.[0]).toHaveLength(20);
     await expect(store.listMessages("user-a", created.id)).resolves.toHaveLength(23);
+  });
+
+  it("sets the title from the first prompt without overwriting it later", async () => {
+    const { api } = setup();
+    const created = (await (
+      await api.conversations(request("POST", "/api/conversations", "user-a", {}), "create")
+    ).json()) as Conversation;
+
+    await api.generation(
+      request("POST", `/api/conversations/${created.id}/generate`, "user-a", {
+        message: "First prompt",
+      }),
+      "first-generation",
+      created.id,
+    );
+    await api.generation(
+      request("POST", `/api/conversations/${created.id}/generate`, "user-a", {
+        message: "Second prompt",
+      }),
+      "second-generation",
+      created.id,
+    );
+
+    const response = await api.conversation(
+      request("GET", `/api/conversations/${created.id}`, "user-a"),
+      "get-conversation",
+      created.id,
+    );
+    await expect(response.json()).resolves.toMatchObject({ title: "First prompt" });
   });
 
   it("returns a controlled error and persists nothing when Gemini fails", async () => {
@@ -312,5 +375,37 @@ describe("authenticated conversation API", () => {
       },
     });
     await expect(store.listMessages("user-a", created.id)).resolves.toEqual([]);
+  });
+
+  it("regenerates by replacing the latest assistant without duplicating the user", async () => {
+    const generate = vi.fn(
+      async (_history: GeminiHistoryMessage[], _message: string) => "Replacement answer",
+    );
+    const { api, store } = setup(generate);
+    const created = (await (
+      await api.conversations(request("POST", "/api/conversations", "user-a", {}), "create")
+    ).json()) as Conversation;
+    const user = await store.createMessage("user-a", created.id, {
+      role: "user",
+      content: "Original question",
+    });
+    const assistant = await store.createMessage("user-a", created.id, {
+      role: "assistant",
+      content: "Original answer",
+    });
+
+    const response = await api.regeneration(
+      request("POST", `/api/conversations/${created.id}/regenerate`, "user-a"),
+      "regenerate",
+      created.id,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      user: { id: user?.id, content: "Original question" },
+      assistant: { id: assistant?.id, content: "Replacement answer" },
+    });
+    expect(generate).toHaveBeenCalledWith([], "Original question", DEFAULT_GEMINI_MODEL);
+    await expect(store.listMessages("user-a", created.id)).resolves.toHaveLength(2);
   });
 });

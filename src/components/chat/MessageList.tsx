@@ -81,7 +81,7 @@ export function MessageList({
           />
         );
       })}
-      {state === "sending" && <TypingIndicator />}
+      {(state === "sending" || (state === "streaming" && !streamingText)) && <TypingIndicator />}
       {streamingBubble && <MessageBubble message={streamingBubble} streaming />}
       <div ref={bottomRef} />
     </div>

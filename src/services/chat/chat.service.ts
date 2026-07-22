@@ -75,15 +75,29 @@ export const chatService: ChatService = {
   },
 
   regenerateResponse(conversationId) {
-    conversationIdSchema.parse(conversationId);
-    return {
-      [Symbol.asyncIterator]() {
-        return {
-          async next(): Promise<IteratorResult<StreamChunk>> {
-            throw new Error("Response regeneration is not available yet.");
-          },
-        };
-      },
-    };
+    const validatedConversationId = conversationIdSchema.parse(conversationId);
+    const controller = new AbortController();
+    generationControllers.get(validatedConversationId)?.abort();
+    generationControllers.set(validatedConversationId, controller);
+
+    async function* run(): AsyncIterable<StreamChunk> {
+      try {
+        const response = generateMessageResponseSchema.parse(
+          await request(
+            `/api/conversations/${encodeURIComponent(validatedConversationId)}/regenerate`,
+            { method: "POST", signal: controller.signal },
+          ),
+        );
+        yield { delta: response.assistant.content };
+        yield { done: true };
+      } catch (error) {
+        if (!isAbortError(error)) throw error;
+      } finally {
+        if (generationControllers.get(validatedConversationId) === controller) {
+          generationControllers.delete(validatedConversationId);
+        }
+      }
+    }
+    return run();
   },
 };

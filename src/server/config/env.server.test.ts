@@ -31,19 +31,16 @@ describe("server environment validation", () => {
     ).toThrow("Invalid server environment: DATABASE_URL");
   });
 
-  it("requires non-empty Gemini configuration only when generation is used", () => {
-    const env = parseServerEnv({ ...validEnv, GEMINI_API_KEY: "", GEMINI_MODEL: "" });
-    expect(() => getGeminiConfig(env)).toThrow(
-      "Invalid server environment: GEMINI_API_KEY, GEMINI_MODEL",
-    );
+  it("requires a non-empty Gemini API key only when generation is used", () => {
+    const env = parseServerEnv({ ...validEnv, GEMINI_API_KEY: "" });
+    expect(() => getGeminiConfig(env)).toThrow("Invalid server environment: GEMINI_API_KEY");
     expect(
       getGeminiConfig(
         parseServerEnv({
           ...validEnv,
           GEMINI_API_KEY: "test-api-key",
-          GEMINI_MODEL: "test-model",
         }),
       ),
-    ).toEqual({ apiKey: "test-api-key", model: "test-model" });
+    ).toEqual({ apiKey: "test-api-key" });
   });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "model_preference" text DEFAULT 'gemini-3.5-flash' NOT NULL;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loginInputSchema, resetPasswordInputSchema, signupInputSchema } from "./auth";
 import { createConversationInputSchema, renameConversationInputSchema } from "./conversations";
 import { sendMessageInputSchema } from "./messages";
+import { modelPreferenceSchema } from "./model-preference";
 
 describe("shared validation contracts", () => {
   it("normalizes valid login input", () => {
@@ -45,6 +46,16 @@ describe("shared validation contracts", () => {
         password: "password123",
         admin: true,
       }).success,
+    ).toBe(false);
+  });
+
+  it("allows only approved Gemini model preferences", () => {
+    expect(modelPreferenceSchema.safeParse({ model: "gemini-3.5-flash" }).success).toBe(true);
+    expect(modelPreferenceSchema.safeParse({ model: "gemini-3.5-flash-lite" }).success).toBe(true);
+    expect(modelPreferenceSchema.safeParse({ model: "gemini-2.5-flash-lite" }).success).toBe(true);
+    expect(modelPreferenceSchema.safeParse({ model: "gemini-arbitrary" }).success).toBe(false);
+    expect(
+      modelPreferenceSchema.safeParse({ model: "gemini-3.5-flash", extra: true }).success,
     ).toBe(false);
   });
 });

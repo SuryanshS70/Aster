@@ -19,11 +19,13 @@ import { Route as ApiConversationsRouteImport } from './routes/api.conversations
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
 import { Route as AuthenticatedChatIndexRouteImport } from './routes/_authenticated.chat.index'
+import { Route as ApiSettingsModelRouteImport } from './routes/api.settings.model'
 import { Route as ApiHealthReadyRouteImport } from './routes/api.health.ready'
 import { Route as ApiHealthLiveRouteImport } from './routes/api.health.live'
 import { Route as ApiConversationsConversationIdRouteImport } from './routes/api.conversations.$conversationId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedChatConversationIdRouteImport } from './routes/_authenticated.chat.$conversationId'
+import { Route as ApiConversationsConversationIdRegenerateRouteImport } from './routes/api.conversations.$conversationId.regenerate'
 import { Route as ApiConversationsConversationIdMessagesRouteImport } from './routes/api.conversations.$conversationId.messages'
 import { Route as ApiConversationsConversationIdGenerateRouteImport } from './routes/api.conversations.$conversationId.generate'
 
@@ -76,6 +78,11 @@ const AuthenticatedChatIndexRoute = AuthenticatedChatIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedChatRoute,
 } as any)
+const ApiSettingsModelRoute = ApiSettingsModelRouteImport.update({
+  id: '/api/settings/model',
+  path: '/api/settings/model',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthReadyRoute = ApiHealthReadyRouteImport.update({
   id: '/api/health/ready',
   path: '/api/health/ready',
@@ -102,6 +109,12 @@ const AuthenticatedChatConversationIdRoute =
     id: '/$conversationId',
     path: '/$conversationId',
     getParentRoute: () => AuthenticatedChatRoute,
+  } as any)
+const ApiConversationsConversationIdRegenerateRoute =
+  ApiConversationsConversationIdRegenerateRouteImport.update({
+    id: '/regenerate',
+    path: '/regenerate',
+    getParentRoute: () => ApiConversationsConversationIdRoute,
   } as any)
 const ApiConversationsConversationIdMessagesRoute =
   ApiConversationsConversationIdMessagesRouteImport.update({
@@ -130,9 +143,11 @@ export interface FileRoutesByFullPath {
   '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/settings/model': typeof ApiSettingsModelRoute
   '/chat/': typeof AuthenticatedChatIndexRoute
   '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
+  '/api/conversations/$conversationId/regenerate': typeof ApiConversationsConversationIdRegenerateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -147,9 +162,11 @@ export interface FileRoutesByTo {
   '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/settings/model': typeof ApiSettingsModelRoute
   '/chat': typeof AuthenticatedChatIndexRoute
   '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
+  '/api/conversations/$conversationId/regenerate': typeof ApiConversationsConversationIdRegenerateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -167,9 +184,11 @@ export interface FileRoutesById {
   '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/settings/model': typeof ApiSettingsModelRoute
   '/_authenticated/chat/': typeof AuthenticatedChatIndexRoute
   '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
+  '/api/conversations/$conversationId/regenerate': typeof ApiConversationsConversationIdRegenerateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -187,9 +206,11 @@ export interface FileRouteTypes {
     | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
+    | '/api/settings/model'
     | '/chat/'
     | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
+    | '/api/conversations/$conversationId/regenerate'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -204,9 +225,11 @@ export interface FileRouteTypes {
     | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
+    | '/api/settings/model'
     | '/chat'
     | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
+    | '/api/conversations/$conversationId/regenerate'
   id:
     | '__root__'
     | '/'
@@ -223,9 +246,11 @@ export interface FileRouteTypes {
     | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
+    | '/api/settings/model'
     | '/_authenticated/chat/'
     | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
+    | '/api/conversations/$conversationId/regenerate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -239,6 +264,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiHealthLiveRoute: typeof ApiHealthLiveRoute
   ApiHealthReadyRoute: typeof ApiHealthReadyRoute
+  ApiSettingsModelRoute: typeof ApiSettingsModelRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -313,6 +339,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatIndexRouteImport
       parentRoute: typeof AuthenticatedChatRoute
     }
+    '/api/settings/model': {
+      id: '/api/settings/model'
+      path: '/api/settings/model'
+      fullPath: '/api/settings/model'
+      preLoaderRoute: typeof ApiSettingsModelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health/ready': {
       id: '/api/health/ready'
       path: '/api/health/ready'
@@ -347,6 +380,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/chat/$conversationId'
       preLoaderRoute: typeof AuthenticatedChatConversationIdRouteImport
       parentRoute: typeof AuthenticatedChatRoute
+    }
+    '/api/conversations/$conversationId/regenerate': {
+      id: '/api/conversations/$conversationId/regenerate'
+      path: '/regenerate'
+      fullPath: '/api/conversations/$conversationId/regenerate'
+      preLoaderRoute: typeof ApiConversationsConversationIdRegenerateRouteImport
+      parentRoute: typeof ApiConversationsConversationIdRoute
     }
     '/api/conversations/$conversationId/messages': {
       id: '/api/conversations/$conversationId/messages'
@@ -395,6 +435,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 interface ApiConversationsConversationIdRouteChildren {
   ApiConversationsConversationIdGenerateRoute: typeof ApiConversationsConversationIdGenerateRoute
   ApiConversationsConversationIdMessagesRoute: typeof ApiConversationsConversationIdMessagesRoute
+  ApiConversationsConversationIdRegenerateRoute: typeof ApiConversationsConversationIdRegenerateRoute
 }
 
 const ApiConversationsConversationIdRouteChildren: ApiConversationsConversationIdRouteChildren =
@@ -403,6 +444,8 @@ const ApiConversationsConversationIdRouteChildren: ApiConversationsConversationI
       ApiConversationsConversationIdGenerateRoute,
     ApiConversationsConversationIdMessagesRoute:
       ApiConversationsConversationIdMessagesRoute,
+    ApiConversationsConversationIdRegenerateRoute:
+      ApiConversationsConversationIdRegenerateRoute,
   }
 
 const ApiConversationsConversationIdRouteWithChildren =
@@ -433,6 +476,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiHealthLiveRoute: ApiHealthLiveRoute,
   ApiHealthReadyRoute: ApiHealthReadyRoute,
+  ApiSettingsModelRoute: ApiSettingsModelRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -11,6 +11,7 @@ import {
   type Conversation,
   type CreateMessageInput,
   type Message,
+  type GeminiModel,
 } from "../../contracts";
 import type { GeminiHistoryMessage } from "../gemini/gemini.server";
 import { getServerEnv } from "../config/env.server";
@@ -43,10 +44,17 @@ export interface ChatStore {
     userContent: string,
     assistantContent: string,
   ): Promise<{ user: Message; assistant: Message } | null>;
+  replaceAssistantMessage(
+    userId: string,
+    conversationId: string,
+    assistantMessageId: string,
+    assistantContent: string,
+  ): Promise<Message | null>;
 }
 
 type ConversationRow = typeof conversations.$inferSelect;
 type MessageRow = typeof messages.$inferSelect;
+const DEFAULT_CONVERSATION_TITLE = "New conversation";
 
 function toConversation(row: ConversationRow): Conversation {
   return {
@@ -132,7 +140,7 @@ export function createChatStore(database: PostgresJsDatabase = getDatabase()): C
 
     async createMessage(userId, conversationId, input) {
       const [owned] = await database
-        .select({ id: conversations.id })
+        .select({ id: conversations.id, title: conversations.title })
         .from(conversations)
         .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
         .limit(1);
@@ -155,7 +163,9 @@ export function createChatStore(database: PostgresJsDatabase = getDatabase()): C
         .update(conversations)
         .set({
           updatedAt: now,
-          ...(input.role === "user" ? { title: input.content.trim().slice(0, 60) } : {}),
+          ...(input.role === "user" && owned.title === DEFAULT_CONVERSATION_TITLE
+            ? { title: input.content.trim().slice(0, 60) }
+            : {}),
         })
         .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
       return toMessage(row);
@@ -181,7 +191,7 @@ export function createChatStore(database: PostgresJsDatabase = getDatabase()): C
     async persistGeneratedMessages(userId, conversationId, userContent, assistantContent) {
       return database.transaction(async (transaction) => {
         const [owned] = await transaction
-          .select({ id: conversations.id })
+          .select({ id: conversations.id, title: conversations.title })
           .from(conversations)
           .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
           .limit(1);
@@ -217,11 +227,43 @@ export function createChatStore(database: PostgresJsDatabase = getDatabase()): C
         await transaction
           .update(conversations)
           .set({
-            title: userContent.trim().slice(0, 60),
+            ...(owned.title === DEFAULT_CONVERSATION_TITLE
+              ? { title: userContent.trim().slice(0, 60) }
+              : {}),
             updatedAt: assistantCreatedAt,
           })
           .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
         return { user: toMessage(userMessage), assistant: toMessage(assistantMessage) };
+      });
+    },
+
+    async replaceAssistantMessage(userId, conversationId, assistantMessageId, assistantContent) {
+      return database.transaction(async (transaction) => {
+        const [owned] = await transaction
+          .select({ id: conversations.id })
+          .from(conversations)
+          .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+          .limit(1);
+        if (!owned) return null;
+
+        const [row] = await transaction
+          .update(messages)
+          .set({ content: assistantContent })
+          .where(
+            and(
+              eq(messages.id, assistantMessageId),
+              eq(messages.conversationId, conversationId),
+              eq(messages.role, "assistant"),
+            ),
+          )
+          .returning();
+        if (!row) return null;
+
+        await transaction
+          .update(conversations)
+          .set({ updatedAt: new Date() })
+          .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
+        return toMessage(row);
       });
     },
   };
@@ -262,21 +304,37 @@ function notFound(): never {
   throw new ApiError(404, "NOT_FOUND", "Conversation not found");
 }
 
-type GenerateWithGemini = (history: GeminiHistoryMessage[], message: string) => Promise<string>;
+type GenerateWithGemini = (
+  history: GeminiHistoryMessage[],
+  message: string,
+  model: GeminiModel,
+) => Promise<string>;
+type ResolveModelPreference = (userId: string) => Promise<GeminiModel>;
 
-async function generateWithGemini(history: GeminiHistoryMessage[], message: string) {
+async function generateWithGemini(
+  history: GeminiHistoryMessage[],
+  message: string,
+  model: GeminiModel,
+) {
   const { createGeminiProvider } = await import("../gemini/gemini.server");
-  return createGeminiProvider().generate(history, message);
+  return createGeminiProvider().generate(history, message, model);
+}
+
+async function resolveModelPreference(userId: string): Promise<GeminiModel> {
+  const { getUserModelPreference } = await import("../settings/model-preference.server");
+  return getUserModelPreference(userId);
 }
 
 export function createChatApi({
   store,
   resolveUserId = resolveVerifiedUserId,
+  resolveModel = resolveModelPreference,
   generate = generateWithGemini,
   bodyLimitBytes = getServerEnv().REQUEST_BODY_LIMIT_BYTES,
 }: {
   store: ChatStore;
   resolveUserId?: ResolveUserId;
+  resolveModel?: ResolveModelPreference;
   generate?: GenerateWithGemini;
   bodyLimitBytes?: number;
 }) {
@@ -293,7 +351,7 @@ export function createChatApi({
             await readJsonBody(request, bodyLimitBytes),
           );
           return jsonResponse(
-            await store.createConversation(userId, input.title ?? "New conversation"),
+            await store.createConversation(userId, input.title ?? DEFAULT_CONVERSATION_TITLE),
             { status: 201 },
           );
         }
@@ -366,10 +424,11 @@ export function createChatApi({
         );
         const history = await store.getRecentMessages(userId, conversationId, 20);
         if (!history) notFound();
+        const model = await resolveModel(userId);
 
         let generated: string;
         try {
-          generated = await generate(history, input.message);
+          generated = await generate(history, input.message, model);
         } catch {
           throw new ApiError(
             502,
@@ -393,6 +452,64 @@ export function createChatApi({
           assistantContent.data,
         );
         return jsonResponse(persisted ?? notFound(), { status: 201 });
+      });
+    },
+
+    regeneration(
+      request: Request,
+      requestId: string,
+      rawConversationId: string,
+    ): Promise<Response> {
+      return withApiErrorBoundary(requestId, async () => {
+        const userId = await requireUserId(request, resolveUserId);
+        const conversationId = parseInput(conversationIdSchema, rawConversationId);
+        if (request.method !== "POST") {
+          throw new ApiError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+
+        const recent = await store.getRecentMessages(userId, conversationId, 22);
+        if (!recent) notFound();
+        const assistant = recent.at(-1);
+        let userIndex = -1;
+        for (let index = recent.length - 2; index >= 0; index -= 1) {
+          if (recent[index]?.role === "user") {
+            userIndex = index;
+            break;
+          }
+        }
+        const user = userIndex >= 0 ? recent[userIndex] : undefined;
+        if (!assistant || assistant.role !== "assistant" || !user) {
+          throw new ApiError(400, "BAD_REQUEST", "No assistant response to regenerate");
+        }
+
+        const model = await resolveModel(userId);
+        const history = recent.slice(Math.max(0, userIndex - 20), userIndex);
+        let generated: string;
+        try {
+          generated = await generate(history, user.content, model);
+        } catch {
+          throw new ApiError(
+            502,
+            "SERVICE_UNAVAILABLE",
+            "Unable to generate a response. Please try again.",
+          );
+        }
+        const assistantContent = messageContentSchema.safeParse(generated);
+        if (!assistantContent.success) {
+          throw new ApiError(
+            502,
+            "SERVICE_UNAVAILABLE",
+            "Unable to generate a response. Please try again.",
+          );
+        }
+
+        const replacement = await store.replaceAssistantMessage(
+          userId,
+          conversationId,
+          assistant.id,
+          assistantContent.data,
+        );
+        return jsonResponse({ user, assistant: replacement ?? notFound() });
       });
     },
   };
@@ -431,4 +548,12 @@ export function handleConversationGenerationRequest(
   conversationId: string,
 ) {
   return getProductionApi().generation(request, requestId, conversationId);
+}
+
+export function handleConversationRegenerationRequest(
+  request: Request,
+  requestId: string,
+  conversationId: string,
+) {
+  return getProductionApi().regeneration(request, requestId, conversationId);
 }

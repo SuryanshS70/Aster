@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { chatService } from "./chat/chat.service";
 import { conversationService } from "./conversations/conversation.service";
+import { modelPreferenceService } from "./settings/model-preference.service";
 
 const conversation = {
   id: "conv_1",
@@ -92,5 +93,45 @@ describe("persistent frontend service mapping", () => {
       message: "Hello",
     });
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "POST" });
+  });
+
+  it("maps regeneration without sending or duplicating the user message", async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        user: message("user", "Hello"),
+        assistant: message("assistant", "Replacement response"),
+      }),
+    );
+
+    const chunks = [];
+    for await (const chunk of chatService.regenerateResponse(conversation.id)) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([{ delta: "Replacement response" }, { done: true }]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/conversations/conv_1/regenerate");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBeUndefined();
+  });
+
+  it("maps model preference loading and saving to the authenticated settings API", async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ model: "gemini-3.5-flash" }))
+      .mockResolvedValueOnce(Response.json({ model: "gemini-3.5-flash-lite" }));
+
+    await modelPreferenceService.get();
+    await modelPreferenceService.update("gemini-3.5-flash-lite");
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/settings/model",
+      "/api/settings/model",
+    ]);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: "same-origin" });
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      method: "PATCH",
+      credentials: "same-origin",
+      body: JSON.stringify({ model: "gemini-3.5-flash-lite" }),
+    });
   });
 });

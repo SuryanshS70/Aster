@@ -1,6 +1,8 @@
 import { relations, sql } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { DEFAULT_GEMINI_MODEL } from "../../contracts/model-preference";
+
 export const user = pgTable(
   "user",
   {
@@ -9,6 +11,7 @@ export const user = pgTable(
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").default(false).notNull(),
     image: text("image"),
+    modelPreference: text("model_preference").default(DEFAULT_GEMINI_MODEL).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-import type { Message } from "../../contracts";
+import type { GeminiModel, Message } from "../../contracts";
 import { getGeminiConfig, type GeminiConfig } from "../config/env.server";
 
 const systemInstruction =
@@ -9,16 +9,16 @@ const systemInstruction =
 export type GeminiHistoryMessage = Pick<Message, "role" | "content">;
 
 export interface GeminiProvider {
-  generate(history: GeminiHistoryMessage[], message: string): Promise<string>;
+  generate(history: GeminiHistoryMessage[], message: string, model: GeminiModel): Promise<string>;
 }
 
 export function createGeminiProvider(config: GeminiConfig = getGeminiConfig()): GeminiProvider {
   const client = new GoogleGenAI({ apiKey: config.apiKey });
 
   return {
-    async generate(history, message) {
+    async generate(history, message, model) {
       const response = await client.models.generateContent({
-        model: config.model,
+        model,
         contents: [
           ...history.map((item) => ({
             role: item.role === "assistant" ? "model" : "user",

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Copy, Check, RotateCcw } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import type { Message } from "@/services";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/common/Logo";
@@ -30,11 +31,66 @@ export function MessageBubble({ message, streaming, onRegenerate }: Props) {
       <div className={cn("flex max-w-[85%] flex-col gap-1", isUser && "items-end")}>
         <div
           className={cn(
-            "whitespace-pre-wrap break-words rounded-2xl text-sm leading-relaxed",
-            isUser ? "bg-primary px-4 py-2.5 text-primary-foreground" : "text-foreground",
+            "break-words rounded-2xl text-sm leading-relaxed",
+            isUser
+              ? "whitespace-pre-wrap bg-primary px-4 py-2.5 text-primary-foreground"
+              : "min-w-0 text-foreground",
           )}
         >
-          {message.content}
+          {isUser ? (
+            message.content
+          ) : (
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => (
+                  <h1 className="mb-3 mt-6 text-xl font-semibold first:mt-0">{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="mb-3 mt-6 text-lg font-semibold first:mt-0">{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="mb-2 mt-5 text-base font-semibold first:mt-0">{children}</h3>
+                ),
+                p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                ul: ({ children }) => (
+                  <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>
+                ),
+                li: ({ children }) => <li className="pl-1">{children}</li>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                blockquote: ({ children }) => (
+                  <blockquote className="my-3 border-l-2 border-primary/40 pl-4 text-muted-foreground">
+                    {children}
+                  </blockquote>
+                ),
+                pre: ({ children }) => (
+                  <pre className="my-3 overflow-x-auto rounded-xl bg-muted p-4 text-xs leading-relaxed [&_code]:bg-transparent [&_code]:p-0">
+                    {children}
+                  </pre>
+                ),
+                code: ({ children }) => (
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.875em]">
+                    {children}
+                  </code>
+                ),
+                a: ({ children, href }) => (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
+                  >
+                    {children}
+                  </a>
+                ),
+                hr: () => <hr className="my-5 border-border" />,
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
           {streaming && (
             <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-current align-middle" />
           )}

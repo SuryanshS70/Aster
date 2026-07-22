@@ -15,6 +15,13 @@
       "when": 1784264037661,
       "tag": "0001_wandering_zuras",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784723870485,
+      "tag": "0002_small_thena",
+      "breakpoints": true
     }
   ]
 }
