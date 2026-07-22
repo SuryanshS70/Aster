@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { projectIdSchema } from "./projects";
 
 export const conversationIdSchema = z
   .string()
@@ -16,6 +17,7 @@ export const conversationTitleSchema = z
 export const createConversationInputSchema = z
   .object({
     title: conversationTitleSchema.optional(),
+    projectId: projectIdSchema.optional(),
   })
   .strict();
 
@@ -29,6 +31,7 @@ export const conversationSchema = z
   .object({
     id: conversationIdSchema,
     title: conversationTitleSchema,
+    projectId: projectIdSchema.nullable(),
     createdAt: z.string().datetime({ offset: true }),
     updatedAt: z.string().datetime({ offset: true }),
   })

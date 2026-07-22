@@ -1,4 +1,5 @@
 import { getServerEnv } from "../config/env.server";
+import { DOCUMENT_UPLOAD_REQUEST_LIMIT_BYTES } from "../../contracts/projects";
 import { getLogger, toSafeError } from "../observability/logger.server";
 import { declaredBodyIsTooLarge } from "./body.server";
 import { jsonErrorResponse } from "./responses.server";
@@ -26,11 +27,14 @@ export async function handleInfrastructureRequest<T extends MiddlewareResult>(
     receivedRequestId && validRequestId.test(receivedRequestId)
       ? receivedRequestId
       : crypto.randomUUID();
+  const bodyLimitBytes = /^\/api\/projects\/[^/]+\/documents$/.test(pathname)
+    ? DOCUMENT_UPLOAD_REQUEST_LIMIT_BYTES
+    : env.REQUEST_BODY_LIMIT_BYTES;
   const logger = getLogger().child({ requestId, method: request.method, pathname });
   const startedAt = performance.now();
 
   try {
-    if (declaredBodyIsTooLarge(request, env.REQUEST_BODY_LIMIT_BYTES)) {
+    if (declaredBodyIsTooLarge(request, bodyLimitBytes)) {
       return applySecurityHeaders(
         jsonErrorResponse(413, "CONTENT_TOO_LARGE", "Request body is too large", requestId),
         requestId,

@@ -15,19 +15,26 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiProjectsRouteImport } from './routes/api.projects'
 import { Route as ApiConversationsRouteImport } from './routes/api.conversations'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
+import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated.projects'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
+import { Route as AuthenticatedProjectsIndexRouteImport } from './routes/_authenticated.projects.index'
 import { Route as AuthenticatedChatIndexRouteImport } from './routes/_authenticated.chat.index'
 import { Route as ApiSettingsModelRouteImport } from './routes/api.settings.model'
+import { Route as ApiProjectsProjectIdRouteImport } from './routes/api.projects.$projectId'
 import { Route as ApiHealthReadyRouteImport } from './routes/api.health.ready'
 import { Route as ApiHealthLiveRouteImport } from './routes/api.health.live'
 import { Route as ApiConversationsConversationIdRouteImport } from './routes/api.conversations.$conversationId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
+import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated.projects.$projectId'
 import { Route as AuthenticatedChatConversationIdRouteImport } from './routes/_authenticated.chat.$conversationId'
+import { Route as ApiProjectsProjectIdDocumentsRouteImport } from './routes/api.projects.$projectId.documents'
 import { Route as ApiConversationsConversationIdRegenerateRouteImport } from './routes/api.conversations.$conversationId.regenerate'
 import { Route as ApiConversationsConversationIdMessagesRouteImport } from './routes/api.conversations.$conversationId.messages'
 import { Route as ApiConversationsConversationIdGenerateRouteImport } from './routes/api.conversations.$conversationId.generate'
+import { Route as ApiProjectsProjectIdDocumentsDocumentIdRouteImport } from './routes/api.projects.$projectId.documents.$documentId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -58,6 +65,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProjectsRoute = ApiProjectsRouteImport.update({
+  id: '/api/projects',
+  path: '/api/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiConversationsRoute = ApiConversationsRouteImport.update({
   id: '/api/conversations',
   path: '/api/conversations',
@@ -68,11 +80,22 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
   id: '/chat',
   path: '/chat',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedProjectsIndexRoute =
+  AuthenticatedProjectsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedProjectsRoute,
+  } as any)
 const AuthenticatedChatIndexRoute = AuthenticatedChatIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -82,6 +105,11 @@ const ApiSettingsModelRoute = ApiSettingsModelRouteImport.update({
   id: '/api/settings/model',
   path: '/api/settings/model',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsProjectIdRoute = ApiProjectsProjectIdRouteImport.update({
+  id: '/$projectId',
+  path: '/$projectId',
+  getParentRoute: () => ApiProjectsRoute,
 } as any)
 const ApiHealthReadyRoute = ApiHealthReadyRouteImport.update({
   id: '/api/health/ready',
@@ -104,11 +132,23 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedProjectsProjectIdRoute =
+  AuthenticatedProjectsProjectIdRouteImport.update({
+    id: '/$projectId',
+    path: '/$projectId',
+    getParentRoute: () => AuthenticatedProjectsRoute,
+  } as any)
 const AuthenticatedChatConversationIdRoute =
   AuthenticatedChatConversationIdRouteImport.update({
     id: '/$conversationId',
     path: '/$conversationId',
     getParentRoute: () => AuthenticatedChatRoute,
+  } as any)
+const ApiProjectsProjectIdDocumentsRoute =
+  ApiProjectsProjectIdDocumentsRouteImport.update({
+    id: '/documents',
+    path: '/documents',
+    getParentRoute: () => ApiProjectsProjectIdRoute,
   } as any)
 const ApiConversationsConversationIdRegenerateRoute =
   ApiConversationsConversationIdRegenerateRouteImport.update({
@@ -128,6 +168,12 @@ const ApiConversationsConversationIdGenerateRoute =
     path: '/generate',
     getParentRoute: () => ApiConversationsConversationIdRoute,
   } as any)
+const ApiProjectsProjectIdDocumentsDocumentIdRoute =
+  ApiProjectsProjectIdDocumentsDocumentIdRouteImport.update({
+    id: '/$documentId',
+    path: '/$documentId',
+    getParentRoute: () => ApiProjectsProjectIdDocumentsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -136,18 +182,25 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/chat': typeof AuthenticatedChatRouteWithChildren
+  '/projects': typeof AuthenticatedProjectsRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/conversations': typeof ApiConversationsRouteWithChildren
+  '/api/projects': typeof ApiProjectsRouteWithChildren
   '/chat/$conversationId': typeof AuthenticatedChatConversationIdRoute
+  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/settings/model': typeof ApiSettingsModelRoute
   '/chat/': typeof AuthenticatedChatIndexRoute
+  '/projects/': typeof AuthenticatedProjectsIndexRoute
   '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
   '/api/conversations/$conversationId/regenerate': typeof ApiConversationsConversationIdRegenerateRoute
+  '/api/projects/$projectId/documents': typeof ApiProjectsProjectIdDocumentsRouteWithChildren
+  '/api/projects/$projectId/documents/$documentId': typeof ApiProjectsProjectIdDocumentsDocumentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -157,16 +210,22 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/conversations': typeof ApiConversationsRouteWithChildren
+  '/api/projects': typeof ApiProjectsRouteWithChildren
   '/chat/$conversationId': typeof AuthenticatedChatConversationIdRoute
+  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/settings/model': typeof ApiSettingsModelRoute
   '/chat': typeof AuthenticatedChatIndexRoute
+  '/projects': typeof AuthenticatedProjectsIndexRoute
   '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
   '/api/conversations/$conversationId/regenerate': typeof ApiConversationsConversationIdRegenerateRoute
+  '/api/projects/$projectId/documents': typeof ApiProjectsProjectIdDocumentsRouteWithChildren
+  '/api/projects/$projectId/documents/$documentId': typeof ApiProjectsProjectIdDocumentsDocumentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -177,18 +236,25 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_authenticated/chat': typeof AuthenticatedChatRouteWithChildren
+  '/_authenticated/projects': typeof AuthenticatedProjectsRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/api/conversations': typeof ApiConversationsRouteWithChildren
+  '/api/projects': typeof ApiProjectsRouteWithChildren
   '/_authenticated/chat/$conversationId': typeof AuthenticatedChatConversationIdRoute
+  '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/conversations/$conversationId': typeof ApiConversationsConversationIdRouteWithChildren
   '/api/health/live': typeof ApiHealthLiveRoute
   '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/settings/model': typeof ApiSettingsModelRoute
   '/_authenticated/chat/': typeof AuthenticatedChatIndexRoute
+  '/_authenticated/projects/': typeof AuthenticatedProjectsIndexRoute
   '/api/conversations/$conversationId/generate': typeof ApiConversationsConversationIdGenerateRoute
   '/api/conversations/$conversationId/messages': typeof ApiConversationsConversationIdMessagesRoute
   '/api/conversations/$conversationId/regenerate': typeof ApiConversationsConversationIdRegenerateRoute
+  '/api/projects/$projectId/documents': typeof ApiProjectsProjectIdDocumentsRouteWithChildren
+  '/api/projects/$projectId/documents/$documentId': typeof ApiProjectsProjectIdDocumentsDocumentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -199,18 +265,25 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/chat'
+    | '/projects'
     | '/settings'
     | '/api/conversations'
+    | '/api/projects'
     | '/chat/$conversationId'
+    | '/projects/$projectId'
     | '/api/auth/$'
     | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
+    | '/api/projects/$projectId'
     | '/api/settings/model'
     | '/chat/'
+    | '/projects/'
     | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
     | '/api/conversations/$conversationId/regenerate'
+    | '/api/projects/$projectId/documents'
+    | '/api/projects/$projectId/documents/$documentId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -220,16 +293,22 @@ export interface FileRouteTypes {
     | '/signup'
     | '/settings'
     | '/api/conversations'
+    | '/api/projects'
     | '/chat/$conversationId'
+    | '/projects/$projectId'
     | '/api/auth/$'
     | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
+    | '/api/projects/$projectId'
     | '/api/settings/model'
     | '/chat'
+    | '/projects'
     | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
     | '/api/conversations/$conversationId/regenerate'
+    | '/api/projects/$projectId/documents'
+    | '/api/projects/$projectId/documents/$documentId'
   id:
     | '__root__'
     | '/'
@@ -239,18 +318,25 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/_authenticated/chat'
+    | '/_authenticated/projects'
     | '/_authenticated/settings'
     | '/api/conversations'
+    | '/api/projects'
     | '/_authenticated/chat/$conversationId'
+    | '/_authenticated/projects/$projectId'
     | '/api/auth/$'
     | '/api/conversations/$conversationId'
     | '/api/health/live'
     | '/api/health/ready'
+    | '/api/projects/$projectId'
     | '/api/settings/model'
     | '/_authenticated/chat/'
+    | '/_authenticated/projects/'
     | '/api/conversations/$conversationId/generate'
     | '/api/conversations/$conversationId/messages'
     | '/api/conversations/$conversationId/regenerate'
+    | '/api/projects/$projectId/documents'
+    | '/api/projects/$projectId/documents/$documentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -261,6 +347,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   ApiConversationsRoute: typeof ApiConversationsRouteWithChildren
+  ApiProjectsRoute: typeof ApiProjectsRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiHealthLiveRoute: typeof ApiHealthLiveRoute
   ApiHealthReadyRoute: typeof ApiHealthReadyRoute
@@ -311,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/projects': {
+      id: '/api/projects'
+      path: '/api/projects'
+      fullPath: '/api/projects'
+      preLoaderRoute: typeof ApiProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/conversations': {
       id: '/api/conversations'
       path: '/api/conversations'
@@ -325,12 +419,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/projects': {
+      id: '/_authenticated/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof AuthenticatedProjectsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/chat': {
       id: '/_authenticated/chat'
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof AuthenticatedChatRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/projects/': {
+      id: '/_authenticated/projects/'
+      path: '/'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof AuthenticatedProjectsIndexRouteImport
+      parentRoute: typeof AuthenticatedProjectsRoute
     }
     '/_authenticated/chat/': {
       id: '/_authenticated/chat/'
@@ -345,6 +453,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/settings/model'
       preLoaderRoute: typeof ApiSettingsModelRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/$projectId': {
+      id: '/api/projects/$projectId'
+      path: '/$projectId'
+      fullPath: '/api/projects/$projectId'
+      preLoaderRoute: typeof ApiProjectsProjectIdRouteImport
+      parentRoute: typeof ApiProjectsRoute
     }
     '/api/health/ready': {
       id: '/api/health/ready'
@@ -374,12 +489,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/projects/$projectId': {
+      id: '/_authenticated/projects/$projectId'
+      path: '/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport
+      parentRoute: typeof AuthenticatedProjectsRoute
+    }
     '/_authenticated/chat/$conversationId': {
       id: '/_authenticated/chat/$conversationId'
       path: '/$conversationId'
       fullPath: '/chat/$conversationId'
       preLoaderRoute: typeof AuthenticatedChatConversationIdRouteImport
       parentRoute: typeof AuthenticatedChatRoute
+    }
+    '/api/projects/$projectId/documents': {
+      id: '/api/projects/$projectId/documents'
+      path: '/documents'
+      fullPath: '/api/projects/$projectId/documents'
+      preLoaderRoute: typeof ApiProjectsProjectIdDocumentsRouteImport
+      parentRoute: typeof ApiProjectsProjectIdRoute
     }
     '/api/conversations/$conversationId/regenerate': {
       id: '/api/conversations/$conversationId/regenerate'
@@ -402,6 +531,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiConversationsConversationIdGenerateRouteImport
       parentRoute: typeof ApiConversationsConversationIdRoute
     }
+    '/api/projects/$projectId/documents/$documentId': {
+      id: '/api/projects/$projectId/documents/$documentId'
+      path: '/$documentId'
+      fullPath: '/api/projects/$projectId/documents/$documentId'
+      preLoaderRoute: typeof ApiProjectsProjectIdDocumentsDocumentIdRouteImport
+      parentRoute: typeof ApiProjectsProjectIdDocumentsRoute
+    }
   }
 }
 
@@ -418,13 +554,30 @@ const AuthenticatedChatRouteChildren: AuthenticatedChatRouteChildren = {
 const AuthenticatedChatRouteWithChildren =
   AuthenticatedChatRoute._addFileChildren(AuthenticatedChatRouteChildren)
 
+interface AuthenticatedProjectsRouteChildren {
+  AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
+  AuthenticatedProjectsIndexRoute: typeof AuthenticatedProjectsIndexRoute
+}
+
+const AuthenticatedProjectsRouteChildren: AuthenticatedProjectsRouteChildren = {
+  AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
+  AuthenticatedProjectsIndexRoute: AuthenticatedProjectsIndexRoute,
+}
+
+const AuthenticatedProjectsRouteWithChildren =
+  AuthenticatedProjectsRoute._addFileChildren(
+    AuthenticatedProjectsRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedChatRoute: typeof AuthenticatedChatRouteWithChildren
+  AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedChatRoute: AuthenticatedChatRouteWithChildren,
+  AuthenticatedProjectsRoute: AuthenticatedProjectsRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
@@ -465,6 +618,45 @@ const ApiConversationsRouteChildren: ApiConversationsRouteChildren = {
 const ApiConversationsRouteWithChildren =
   ApiConversationsRoute._addFileChildren(ApiConversationsRouteChildren)
 
+interface ApiProjectsProjectIdDocumentsRouteChildren {
+  ApiProjectsProjectIdDocumentsDocumentIdRoute: typeof ApiProjectsProjectIdDocumentsDocumentIdRoute
+}
+
+const ApiProjectsProjectIdDocumentsRouteChildren: ApiProjectsProjectIdDocumentsRouteChildren =
+  {
+    ApiProjectsProjectIdDocumentsDocumentIdRoute:
+      ApiProjectsProjectIdDocumentsDocumentIdRoute,
+  }
+
+const ApiProjectsProjectIdDocumentsRouteWithChildren =
+  ApiProjectsProjectIdDocumentsRoute._addFileChildren(
+    ApiProjectsProjectIdDocumentsRouteChildren,
+  )
+
+interface ApiProjectsProjectIdRouteChildren {
+  ApiProjectsProjectIdDocumentsRoute: typeof ApiProjectsProjectIdDocumentsRouteWithChildren
+}
+
+const ApiProjectsProjectIdRouteChildren: ApiProjectsProjectIdRouteChildren = {
+  ApiProjectsProjectIdDocumentsRoute:
+    ApiProjectsProjectIdDocumentsRouteWithChildren,
+}
+
+const ApiProjectsProjectIdRouteWithChildren =
+  ApiProjectsProjectIdRoute._addFileChildren(ApiProjectsProjectIdRouteChildren)
+
+interface ApiProjectsRouteChildren {
+  ApiProjectsProjectIdRoute: typeof ApiProjectsProjectIdRouteWithChildren
+}
+
+const ApiProjectsRouteChildren: ApiProjectsRouteChildren = {
+  ApiProjectsProjectIdRoute: ApiProjectsProjectIdRouteWithChildren,
+}
+
+const ApiProjectsRouteWithChildren = ApiProjectsRoute._addFileChildren(
+  ApiProjectsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
@@ -473,6 +665,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   ApiConversationsRoute: ApiConversationsRouteWithChildren,
+  ApiProjectsRoute: ApiProjectsRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiHealthLiveRoute: ApiHealthLiveRoute,
   ApiHealthReadyRoute: ApiHealthReadyRoute,

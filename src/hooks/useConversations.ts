@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CreateConversationInput } from "@/contracts/conversations";
 import { conversationService } from "@/services";
 import { queryKeys } from "./queryKeys";
 
@@ -12,7 +13,8 @@ export function useConversations() {
 export function useCreateConversation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (title?: string) => conversationService.createConversation({ title }),
+    mutationFn: (input: CreateConversationInput = {}) =>
+      conversationService.createConversation(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.conversations }),
   });
 }

@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { check, foreignKey, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth-schema";
+import { projects } from "./project-schema";
 
 export const conversations = pgTable(
   "conversations",
@@ -11,10 +12,19 @@ export const conversations = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    projectId: text("project_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("conversations_user_updated_idx").on(table.userId, table.updatedAt)],
+  (table) => [
+    index("conversations_user_updated_idx").on(table.userId, table.updatedAt),
+    index("conversations_project_updated_idx").on(table.projectId, table.updatedAt),
+    foreignKey({
+      name: "conversations_project_owner_fk",
+      columns: [table.projectId, table.userId],
+      foreignColumns: [projects.id, projects.userId],
+    }).onDelete("cascade"),
+  ],
 );
 
 export const messages = pgTable(

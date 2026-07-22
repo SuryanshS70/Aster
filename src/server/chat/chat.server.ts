@@ -16,14 +16,19 @@ import {
 import type { GeminiHistoryMessage } from "../gemini/gemini.server";
 import { getServerEnv } from "../config/env.server";
 import { getDatabase } from "../db/client.server";
-import { conversations, messages } from "../db/schema";
+import { conversations, messages, projectDocuments, projects } from "../db/schema";
 import { withApiErrorBoundary } from "../http/api-handler.server";
 import { readJsonBody } from "../http/body.server";
 import { ApiError, jsonResponse } from "../http/responses.server";
+import { retrieveRelevantContext } from "../projects/retrieval.server";
 
 export interface ChatStore {
   listConversations(userId: string): Promise<Conversation[]>;
-  createConversation(userId: string, title: string): Promise<Conversation>;
+  createConversation(
+    userId: string,
+    title: string,
+    projectId?: string,
+  ): Promise<Conversation | null>;
   getConversation(userId: string, id: string): Promise<Conversation | null>;
   renameConversation(userId: string, id: string, title: string): Promise<Conversation | null>;
   deleteConversation(userId: string, id: string): Promise<boolean>;
@@ -38,6 +43,11 @@ export interface ChatStore {
     conversationId: string,
     limit: number,
   ): Promise<Message[] | null>;
+  getProjectContext(
+    userId: string,
+    conversationId: string,
+    query: string,
+  ): Promise<string | null | undefined>;
   persistGeneratedMessages(
     userId: string,
     conversationId: string,
@@ -60,6 +70,7 @@ function toConversation(row: ConversationRow): Conversation {
   return {
     id: row.id,
     title: row.title,
+    projectId: row.projectId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -87,10 +98,18 @@ export function createChatStore(database: PostgresJsDatabase = getDatabase()): C
       return rows.map(toConversation);
     },
 
-    async createConversation(userId, title) {
+    async createConversation(userId, title, projectId) {
+      if (projectId) {
+        const [ownedProject] = await database
+          .select({ id: projects.id })
+          .from(projects)
+          .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+          .limit(1);
+        if (!ownedProject) return null;
+      }
       const [row] = await database
         .insert(conversations)
-        .values({ id: crypto.randomUUID(), userId, title })
+        .values({ id: crypto.randomUUID(), userId, title, projectId: projectId ?? null })
         .returning();
       if (!row) throw new Error("Conversation insert did not return a row");
       return toConversation(row);
@@ -186,6 +205,31 @@ export function createChatStore(database: PostgresJsDatabase = getDatabase()): C
         .orderBy(desc(messages.createdAt), desc(messages.id))
         .limit(limit);
       return rows.reverse().map(toMessage);
+    },
+    async getProjectContext(userId, conversationId, query) {
+      const [owned] = await database
+        .select({ projectId: conversations.projectId })
+        .from(conversations)
+        .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+        .limit(1);
+      if (!owned) return null;
+      if (!owned.projectId) return undefined;
+
+      const documents = await database
+        .select({
+          filename: projectDocuments.originalFilename,
+          text: projectDocuments.extractedText,
+        })
+        .from(projectDocuments)
+        .innerJoin(projects, eq(projects.id, projectDocuments.projectId))
+        .where(
+          and(
+            eq(projectDocuments.projectId, owned.projectId),
+            eq(projectDocuments.processingStatus, "ready"),
+            eq(projects.userId, userId),
+          ),
+        );
+      return retrieveRelevantContext(documents, query);
     },
 
     async persistGeneratedMessages(userId, conversationId, userContent, assistantContent) {
@@ -303,11 +347,15 @@ function parseInput<T>(
 function notFound(): never {
   throw new ApiError(404, "NOT_FOUND", "Conversation not found");
 }
+function projectNotFound(): never {
+  throw new ApiError(404, "NOT_FOUND", "Project not found");
+}
 
 type GenerateWithGemini = (
   history: GeminiHistoryMessage[],
   message: string,
   model: GeminiModel,
+  projectContext?: string,
 ) => Promise<string>;
 type ResolveModelPreference = (userId: string) => Promise<GeminiModel>;
 
@@ -315,9 +363,10 @@ async function generateWithGemini(
   history: GeminiHistoryMessage[],
   message: string,
   model: GeminiModel,
+  projectContext?: string,
 ) {
   const { createGeminiProvider } = await import("../gemini/gemini.server");
-  return createGeminiProvider().generate(history, message, model);
+  return createGeminiProvider().generate(history, message, model, projectContext);
 }
 
 async function resolveModelPreference(userId: string): Promise<GeminiModel> {
@@ -350,10 +399,14 @@ export function createChatApi({
             createConversationInputSchema,
             await readJsonBody(request, bodyLimitBytes),
           );
-          return jsonResponse(
-            await store.createConversation(userId, input.title ?? DEFAULT_CONVERSATION_TITLE),
-            { status: 201 },
+          const conversation = await store.createConversation(
+            userId,
+            input.title ?? DEFAULT_CONVERSATION_TITLE,
+            input.projectId,
           );
+          return jsonResponse(conversation ?? projectNotFound(), {
+            status: 201,
+          });
         }
         throw new ApiError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
       });
@@ -425,10 +478,12 @@ export function createChatApi({
         const history = await store.getRecentMessages(userId, conversationId, 20);
         if (!history) notFound();
         const model = await resolveModel(userId);
+        const projectContext = await store.getProjectContext(userId, conversationId, input.message);
+        if (projectContext === null) notFound();
 
         let generated: string;
         try {
-          generated = await generate(history, input.message, model);
+          generated = await generate(history, input.message, model, projectContext);
         } catch {
           throw new ApiError(
             502,
@@ -486,7 +541,13 @@ export function createChatApi({
         const history = recent.slice(Math.max(0, userIndex - 20), userIndex);
         let generated: string;
         try {
-          generated = await generate(history, user.content, model);
+          const projectContext = await store.getProjectContext(
+            userId,
+            conversationId,
+            user.content,
+          );
+          if (projectContext === null) notFound();
+          generated = await generate(history, user.content, model, projectContext);
         } catch {
           throw new ApiError(
             502,

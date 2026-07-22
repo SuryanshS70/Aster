@@ -1,10 +1,12 @@
 import { useEffect } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { FolderOpen } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChatShell } from "@/components/chat/ChatShell";
 import { MessageList } from "@/components/chat/MessageList";
 import { Composer } from "@/components/chat/Composer";
 import { useConversations } from "@/hooks/useConversations";
 import { useSendMessage } from "@/hooks/useMessages";
+import { useProject } from "@/hooks/useProjects";
 
 type Search = { initial?: string };
 
@@ -21,6 +23,7 @@ function ChatConversationPage() {
   const navigate = useNavigate();
   const conversations = useConversations();
   const conv = conversations.data?.find((c) => c.id === conversationId);
+  const project = useProject(conv?.projectId ?? undefined);
   const { send, stop, regenerate, streamingText, state } = useSendMessage(conversationId);
 
   // If an initial prompt was passed via search (from EmptyChat), fire it once.
@@ -41,6 +44,18 @@ function ChatConversationPage() {
 
   return (
     <ChatShell title={conv?.title ?? "Chat"}>
+      {conv?.projectId && (
+        <Link
+          to="/projects/$projectId"
+          params={{ projectId: conv.projectId }}
+          className="flex items-center gap-2 border-b bg-primary/5 px-4 py-2 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <FolderOpen className="h-3.5 w-3.5 text-primary" />
+          <span>
+            Using project knowledge: <strong>{project.data?.name ?? "Project"}</strong>
+          </span>
+        </Link>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <MessageList
           key={conversationId}

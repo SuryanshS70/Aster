@@ -13,10 +13,16 @@ import { createChatApi, type ChatStore } from "./chat.server";
 class MemoryChatStore implements ChatStore {
   private conversations = new Map<string, Conversation & { userId: string }>();
   private messages = new Map<string, Message[]>();
+  private projects = new Map<string, string>();
+  private projectContexts = new Map<string, string>();
   private sequence = 0;
 
   messageCount(conversationId: string) {
     return this.messages.get(conversationId)?.length ?? 0;
+  }
+  addProject(projectId: string, userId: string, context = "") {
+    this.projects.set(projectId, userId);
+    this.projectContexts.set(projectId, context);
   }
 
   async listConversations(userId: string) {
@@ -25,12 +31,14 @@ class MemoryChatStore implements ChatStore {
       .map(({ userId: _userId, ...conversation }) => conversation);
   }
 
-  async createConversation(userId: string, title: string) {
+  async createConversation(userId: string, title: string, projectId?: string) {
+    if (projectId && this.projects.get(projectId) !== userId) return null;
     const now = new Date(Date.UTC(2026, 0, 1, 0, 0, this.sequence++)).toISOString();
     const conversation = {
-      id: `conv_${this.sequence}`,
+      id: "conv_" + this.sequence,
       userId,
       title,
+      projectId: projectId ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -91,6 +99,13 @@ class MemoryChatStore implements ChatStore {
     return existing?.slice(-limit) ?? null;
   }
 
+  async getProjectContext(userId: string, conversationId: string) {
+    const conversation = this.conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) return null;
+    if (!conversation.projectId) return undefined;
+    return this.projectContexts.get(conversation.projectId) ?? "";
+  }
+
   async persistGeneratedMessages(
     userId: string,
     conversationId: string,
@@ -143,6 +158,7 @@ function setup(
     history: GeminiHistoryMessage[],
     message: string,
     model: GeminiModel,
+    projectContext?: string,
   ) => Promise<string> = async () => "Generated response",
   model: GeminiModel = DEFAULT_GEMINI_MODEL,
 ) {
@@ -317,10 +333,51 @@ describe("authenticated conversation API", () => {
       expect.arrayContaining([expect.objectContaining({ content: "History 20" })]),
       "New question",
       "gemini-3.5-flash-lite",
+      undefined,
     );
     expect(resolveModel).toHaveBeenCalledWith("user-a");
     expect(generate.mock.calls[0]?.[0]).toHaveLength(20);
     await expect(store.listMessages("user-a", created.id)).resolves.toHaveLength(23);
+  });
+
+  it("includes only owned project context in Gemini generation", async () => {
+    const generate = vi.fn(async () => "Project answer");
+    const { api, store } = setup(generate);
+    store.addProject("project_1", "user-a", "[Source: notes.txt]\nThe launch date is October 4.");
+
+    const createdResponse = await api.conversations(
+      request("POST", "/api/conversations", "user-a", {
+        title: "Project chat",
+        projectId: "project_1",
+      }),
+      "create-project-chat",
+    );
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as Conversation;
+    expect(created.projectId).toBe("project_1");
+
+    const foreignCreate = await api.conversations(
+      request("POST", "/api/conversations", "user-b", {
+        projectId: "project_1",
+      }),
+      "foreign-project-chat",
+    );
+    expect(foreignCreate.status).toBe(404);
+
+    const generated = await api.generation(
+      request("POST", "/api/conversations/" + created.id + "/generate", "user-a", {
+        message: "When is launch?",
+      }),
+      "project-generation",
+      created.id,
+    );
+    expect(generated.status).toBe(201);
+    expect(generate).toHaveBeenCalledWith(
+      [],
+      "When is launch?",
+      DEFAULT_GEMINI_MODEL,
+      "[Source: notes.txt]\nThe launch date is October 4.",
+    );
   });
 
   it("sets the title from the first prompt without overwriting it later", async () => {
@@ -405,7 +462,7 @@ describe("authenticated conversation API", () => {
       user: { id: user?.id, content: "Original question" },
       assistant: { id: assistant?.id, content: "Replacement answer" },
     });
-    expect(generate).toHaveBeenCalledWith([], "Original question", DEFAULT_GEMINI_MODEL);
+    expect(generate).toHaveBeenCalledWith([], "Original question", DEFAULT_GEMINI_MODEL, undefined);
     await expect(store.listMessages("user-a", created.id)).resolves.toHaveLength(2);
   });
 });

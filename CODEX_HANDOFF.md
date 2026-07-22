@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 
-Minimal per-user Gemini model selection is complete. Aster remains a TanStack Start modular monolith with the existing Better Auth session flow, PostgreSQL conversation/message persistence, and Lovable chat interface.
+Minimal authenticated Projects and document-grounded chat are complete. Aster remains a TanStack Start modular monolith with Better Auth, PostgreSQL persistence, server-only Gemini generation, and the Lovable chat interface.
 
-The browser sends one non-streaming generation request. The authenticated server validates ownership, loads the user's approved model preference, supplies a bounded conversation history to Gemini, and persists the returned user and assistant messages together.
+Users can create a project, upload a PDF or UTF-8 text document, and create persistent project chats. The server extracts and stores document text, selects a small set of relevant chunks for each question, and supplies them to Gemini without exposing document data or secrets to the browser.
 
 ## Implemented
 
@@ -26,6 +26,17 @@ The browser sends one non-streaming generation request. The authenticated server
 - Added `user.model_preference` with a database default of `gemini-3.5-flash` in `drizzle/0002_small_thena.sql`.
 - Generation and regeneration load the authenticated user's stored preference before calling Gemini.
 - The Gemini API key, SDK, and final model choice remain server-only.
+- Added authenticated project CRUD and project-document list/upload/delete endpoints.
+- Added `projects`, `project_documents`, and nullable `conversations.project_id` in `drizzle/0003_petite_inhumans.sql`.
+- Project deletion cascades to documents, project conversations, and their messages.
+- A composite project/user foreign key prevents a conversation from referencing another user's project.
+- PDF and UTF-8 plain-text uploads are limited to 5 MB and processed synchronously.
+- Raw files are not retained; PostgreSQL stores document metadata, status, errors, and extracted text.
+- Project text is split into overlapping chunks and ranked lexically for each question.
+- At most four chunks and 5,600 characters of document context are sent to Gemini.
+- Document text is passed as untrusted user-level reference context, not as a system instruction.
+- Added Projects list/detail screens, document states, project chat links, and a project-knowledge banner.
+- Added focused ownership, processing, retrieval, generation-context, and frontend mapping tests.
 
 ## Required environment variables
 
@@ -57,6 +68,18 @@ The model is selected per user in Settings, so `GEMINI_MODEL` is no longer used.
 - `src/server/settings/model-preference.server.ts`
 - `src/routes/api.settings.model.ts`
 - `src/services/settings/model-preference.service.ts`
+- `src/contracts/projects.ts`
+- `src/server/db/project-schema.ts`
+- `src/server/projects/document-processing.server.ts`
+- `src/server/projects/retrieval.server.ts`
+- `src/server/projects/projects.server.ts`
+- `src/routes/api.projects*.ts`
+- `src/services/projects/*`
+- `src/hooks/useProjects.ts`
+- `src/routes/_authenticated.projects*.tsx`
+- `drizzle/0003_petite_inhumans.sql`
+- Project-aware updates to the conversation schema, chat server, Gemini provider, sidebar, and chat route
+- Focused project server, processing, retrieval, contract, and service tests
 - `src/hooks/useModelPreference.ts`
 - `src/components/settings/ModelSettings.tsx`
 - `drizzle/0002_small_thena.sql`
@@ -68,9 +91,9 @@ Checkpoint verification on 2026-07-22:
 
 - `npm run typecheck` - passed
 - `npm run lint` - passed
-- `npm test` - passed: 13 files, 49 tests
+- `npm test` - passed: 16 files, 60 tests
 - `npm run build` - passed with the Node/Nitro production target
-- Built browser assets contain no `@google/genai`, `GEMINI_API_KEY`, or `GEMINI_MODEL` references
+- Built browser assets contain no `@google/genai`, `GEMINI_API_KEY`, `GEMINI_MODEL`, or `pdf-parse` references
 
 Focused tests additionally cover the model allowlist, unauthenticated settings access, per-user preference updates, frontend request mapping, and passing the authenticated user's selected model to Gemini.
 
@@ -89,9 +112,23 @@ Focused tests additionally cover the model allowlist, unauthenticated settings a
 11. With two accounts, confirm their saved model selections remain independent.
 12. Click Regenerate on the latest assistant response and confirm its content is replaced without adding another user message.
 
+13. Open Projects from the user menu and create a project.
+14. Upload a small UTF-8 `.txt` file and confirm its status becomes Ready.
+15. Upload a text-based PDF and confirm extraction becomes Ready.
+16. Create a project chat, ask a question answered by the document, and confirm Gemini uses it.
+17. Ask for information absent from the document and confirm Gemini says it was not found.
+18. Refresh the chat and confirm the project banner and message history remain.
+19. With a second account, confirm the project, documents, and project chats return 404.
+20. Delete the project and confirm its documents and project chats disappear.
+
 ## Known limitations
 
 - Generation is non-streaming, so the response appears after Gemini completes.
 - Browser abort does not cancel work already running at Gemini or on the server; a completed request may still be persisted after the browser stops waiting.
 - Context is limited to the latest 20 messages with no summarization.
-- There is no token/cost accounting, quotas, moderation layer, tools, search, RAG, uploads, or server-side generation cancellation.
+- Retrieval is lexical chunk scoring, not embeddings or semantic/vector search.
+- PDF extraction supports text-based PDFs only; there is no OCR for scanned pages.
+- Upload processing is synchronous, and raw uploaded files are not retained.
+- Each document is limited to 5 MB and extracted text to 2,000,000 characters.
+- There is no background job system, collaborative projects, sharing, cloud file storage, or web crawling.
+- There is no token/cost accounting, quotas, moderation layer, tools, search, or server-side generation cancellation.

@@ -27,7 +27,7 @@ function ChatIndex() {
   }, [conversations.data, navigate]);
 
   async function startFrom(prompt: string) {
-    const conv = await create.mutateAsync(prompt.slice(0, 60));
+    const conv = await create.mutateAsync({ title: prompt.slice(0, 60) });
     navigate({
       to: "/chat/$conversationId",
       params: { conversationId: conv.id },

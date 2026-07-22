@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chatService } from "./chat/chat.service";
 import { conversationService } from "./conversations/conversation.service";
 import { modelPreferenceService } from "./settings/model-preference.service";
+import { projectService } from "./projects/project.service";
 
 const conversation = {
   id: "conv_1",
   title: "Test chat",
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
+  projectId: null,
 };
 
 function message(role: "user" | "assistant", content: string) {
@@ -133,5 +135,57 @@ describe("persistent frontend service mapping", () => {
       credentials: "same-origin",
       body: JSON.stringify({ model: "gemini-3.5-flash-lite" }),
     });
+  });
+
+  it("maps project and document operations to authenticated APIs", async () => {
+    const project = {
+      id: "project_1",
+      name: "Research",
+      description: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const document = {
+      id: "document_1",
+      projectId: project.id,
+      originalFilename: "notes.txt",
+      mimeType: "text/plain",
+      fileSize: 5,
+      processingStatus: "ready",
+      processingError: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    fetchMock
+      .mockResolvedValueOnce(Response.json([project]))
+      .mockResolvedValueOnce(Response.json(project, { status: 201 }))
+      .mockResolvedValueOnce(Response.json({ ...project, name: "Renamed" }))
+      .mockResolvedValueOnce(Response.json([document]))
+      .mockResolvedValueOnce(Response.json(document, { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await projectService.getProjects();
+    await projectService.createProject({ name: "Research" });
+    await projectService.updateProject(project.id, { name: "Renamed" });
+    await projectService.getDocuments(project.id);
+    await projectService.uploadDocument(
+      project.id,
+      new File(["notes"], "notes.txt", { type: "text/plain" }),
+    );
+    await projectService.deleteDocument(project.id, document.id);
+    await projectService.deleteProject(project.id);
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/projects",
+      "/api/projects",
+      "/api/projects/project_1",
+      "/api/projects/project_1/documents",
+      "/api/projects/project_1/documents",
+      "/api/projects/project_1/documents/document_1",
+      "/api/projects/project_1",
+    ]);
+    expect(fetchMock.mock.calls[4]?.[1]?.body).toBeInstanceOf(FormData);
+    expect(fetchMock.mock.calls[5]?.[1]).toMatchObject({ method: "DELETE" });
   });
 });

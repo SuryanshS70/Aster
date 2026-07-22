@@ -24,18 +24,21 @@ export const mockConversations: Conversation[] = [
     id: "conv_welcome",
     title: "Welcome to Aster",
     createdAt: iso(1000 * 60 * 30),
+    projectId: null,
     updatedAt: iso(1000 * 60 * 5),
   },
   {
     id: "conv_ideas",
     title: "Product ideas brainstorm",
     createdAt: iso(1000 * 60 * 60 * 24),
+    projectId: null,
     updatedAt: iso(1000 * 60 * 60 * 22),
   },
   {
     id: "conv_recipe",
     title: "Weeknight dinner ideas",
     createdAt: iso(1000 * 60 * 60 * 24 * 3),
+    projectId: null,
     updatedAt: iso(1000 * 60 * 60 * 24 * 3),
   },
 ];

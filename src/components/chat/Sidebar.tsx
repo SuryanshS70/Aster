@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Plus, Trash2, LogOut, MessageSquare, Pencil } from "lucide-react";
+import { FolderOpen, Plus, Trash2, LogOut, MessageSquare, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,7 +52,7 @@ export function Sidebar({ onNavigate }: Props) {
   const params = useParams({ strict: false }) as { conversationId?: string };
 
   async function handleNew() {
-    const conv = await create.mutateAsync(undefined);
+    const conv = await create.mutateAsync({});
     onNavigate?.();
     navigate({ to: "/chat/$conversationId", params: { conversationId: conv.id } });
   }
@@ -160,6 +160,11 @@ export function Sidebar({ onNavigate }: Props) {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem asChild>
+              <Link to="/projects">
+                <FolderOpen className="mr-2 h-4 w-4" /> Projects
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to="/settings">Settings</Link>
             </DropdownMenuItem>

@@ -3,6 +3,7 @@ import { loginInputSchema, resetPasswordInputSchema, signupInputSchema } from ".
 import { createConversationInputSchema, renameConversationInputSchema } from "./conversations";
 import { sendMessageInputSchema } from "./messages";
 import { modelPreferenceSchema } from "./model-preference";
+import { createProjectInputSchema, projectDocumentMimeTypeSchema } from "./projects";
 
 describe("shared validation contracts", () => {
   it("normalizes valid login input", () => {
@@ -47,6 +48,18 @@ describe("shared validation contracts", () => {
         admin: true,
       }).success,
     ).toBe(false);
+  });
+  it("validates project names, descriptions, and document types", () => {
+    expect(
+      createProjectInputSchema.safeParse({
+        name: "Research",
+        description: "Notes for launch planning",
+      }).success,
+    ).toBe(true);
+    expect(createProjectInputSchema.safeParse({ name: "   " }).success).toBe(false);
+    expect(projectDocumentMimeTypeSchema.safeParse("application/pdf").success).toBe(true);
+    expect(projectDocumentMimeTypeSchema.safeParse("text/plain").success).toBe(true);
+    expect(projectDocumentMimeTypeSchema.safeParse("text/html").success).toBe(false);
   });
 
   it("allows only approved Gemini model preferences", () => {

@@ -28,5 +28,13 @@ export type {
 } from "./chat/chat.types";
 export { MessageRateLimitError } from "./chat/chat.types";
 export { chatService } from "./chat/chat.service";
+export type {
+  CreateProjectInput,
+  Project,
+  ProjectDocument,
+  ProjectService,
+  UpdateProjectInput,
+} from "./projects/project.types";
+export { projectService } from "./projects/project.service";
 
 export { modelPreferenceService } from "./settings/model-preference.service";
